@@ -16,7 +16,7 @@ import { DEMO_SCENARIO_LABELS } from '../mocks/mockScenarios';
 import VerdictBanner from '../components/VerdictBanner';
 import SafetyFlagCard from '../components/SafetyFlagCard';
 
-type Phase = 'ready' | 'loading' | 'result';
+type Phase = 'ready' | 'loading' | 'result' | 'error';
 
 const DEMO_SCENARIOS = Object.entries(DEMO_SCENARIO_LABELS) as [DemoScenario, string][];
 
@@ -109,7 +109,7 @@ export default function ScanScreen() {
       setPhase('result');
     } catch {
       stopAnimation();
-      setPhase('ready');
+      setPhase('error');
     }
   }, [permission, clinicalText, selectedDemo, runLoadingAnimation]);
 
@@ -162,6 +162,22 @@ export default function ScanScreen() {
     setResult(null);
     setLoadingStep(0);
   }, [stopAudio]);
+
+  // ── Error phase ────────────────────────────────────────────────────────────
+  if (phase === 'error') {
+    return (
+      <View style={styles.center}>
+        <Ionicons name="alert-circle" size={52} color={Colors.blocked} />
+        <Text style={styles.errorTitle}>Analysis Failed</Text>
+        <Text style={styles.errorDetail}>
+          Could not reach the verification server. Check your connection and try again.
+        </Text>
+        <TouchableOpacity style={styles.permButton} onPress={handleReset}>
+          <Text style={styles.permButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   // ── Permission gate (live mode only) ──────────────────────────────────────
   if (!DEMO_MODE) {
@@ -414,6 +430,8 @@ const styles = StyleSheet.create({
     padding: 32, gap: 16, backgroundColor: Colors.background,
   },
   permText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  errorTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, textAlign: 'center' },
+  errorDetail: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', lineHeight: 19 },
   permButton: {
     backgroundColor: Colors.primary, paddingHorizontal: 24,
     paddingVertical: 12, borderRadius: 8,

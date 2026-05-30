@@ -66,17 +66,20 @@ function HistoryCard({ item }: { item: ScanHistoryEntry }) {
       </View>
 
       <View style={styles.medsRow}>
-        {item.matched_medications.map((med, i) => (
-          <View key={i} style={styles.medChip}>
-            <Text style={styles.medChipText}>{med}</Text>
-          </View>
-        ))}
+        {item.matched_medications.length === 0 ? (
+          <Text style={styles.noMedsText}>No meds confirmed</Text>
+        ) : (
+          item.matched_medications.map((med, i) => (
+            <View key={i} style={styles.medChip}>
+              <Text style={styles.medChipText}>{med}</Text>
+            </View>
+          ))
+        )}
       </View>
 
       <View style={styles.hashRow}>
         <Ionicons name="lock-closed-outline" size={12} color={Colors.textLight} />
         <Text style={styles.hashText} numberOfLines={1}>{item.solana_payload_hash}</Text>
-        <Ionicons name="lock-closed-outline" size={14} color={Colors.textLight} />
       </View>
     </View>
   );
@@ -180,7 +183,8 @@ const styles = StyleSheet.create({
   flagCountText: { fontSize: 10, color: Colors.blocked, fontWeight: '700' },
   timestamp: { fontSize: 11, color: Colors.textSecondary, marginLeft: 'auto' },
 
-  medsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  medsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, minHeight: 22, alignItems: 'center' },
+  noMedsText: { fontSize: 12, color: Colors.textLight, fontStyle: 'italic' },
   medChip: {
     backgroundColor: '#EEF2FF',
     borderRadius: 12,
