@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "MedsCrossLink",
+    "slug": "meds-crosslink",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MedsCrossLink needs camera access to scan your medications."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.quackhacks.medscrosslink"
+    },
+    "android": {
+      "package": "com.quackhacks.medscrosslink",
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
