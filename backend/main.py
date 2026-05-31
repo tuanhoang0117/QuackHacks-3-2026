@@ -218,6 +218,13 @@ async def log_dose(request: LogDoseRequest):
     return JSONResponse(content={"status": "logged"})
 
 
+@app.delete("/log-dose/{patient_id}")
+def clear_doses(patient_id: str):
+    """Clears all dose log entries for a patient. Useful for resetting demo state."""
+    result = db.dose_log.delete_many({"patient_id": patient_id})
+    return JSONResponse(content={"status": "cleared", "deleted": result.deleted_count})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "db": "connected" if mongo.server_info() else "unreachable"}
