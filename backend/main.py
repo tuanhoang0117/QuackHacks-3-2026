@@ -164,7 +164,7 @@ async def summarize(request: SummarizeRequest):
     Returns a plain-language summary + audio from ElevenLabs.
     """
     summary = summarize_document(request.clinical_text)
-    audio = await _speak_audio(summary)
+    audio = await _speak_audio(summary[:1000])
     return StreamingResponse(
         iter([audio]),
         media_type="audio/mpeg",
