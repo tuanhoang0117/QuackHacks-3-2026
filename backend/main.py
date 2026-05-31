@@ -1,5 +1,6 @@
 import os
 import subprocess
+import datetime
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -8,7 +9,7 @@ from pymongo import MongoClient
 import httpx
 from dotenv import load_dotenv
 
-from perception_agent import extract_observations
+from perception_agent import extract_observations, extract_document_text
 from safety_engine import decide
 from chat_agent import summarize_document, answer_question
 
@@ -42,6 +43,11 @@ class AskRequest(BaseModel):
     question: str
     clinical_context: str
     patient_id: str = "PT-9942"
+
+class LogDoseRequest(BaseModel):
+    patient_id: str
+    medication_name: str
+    timestamp: str
 
 
 # ---------- Helpers ----------
@@ -118,7 +124,6 @@ async def verify(
 
     # Log this dose to dose_log on any non-blocked clean verification
     if result.verification_successful:
-        import datetime
         for drug in result.matched_medications:
             db.dose_log.insert_one({
                 "patient_id": patient_id,
@@ -167,6 +172,50 @@ async def ask(request: AskRequest):
         media_type="audio/mpeg",
         headers={"X-Answer-Text": answer[:500]},
     )
+
+
+@app.post("/document/summary")
+async def document_summary(
+    image: UploadFile = File(...),
+    patient_id: str = Form(...),
+):
+    """
+    Takes a photo of a discharge document.
+    Returns plain-language summary as JSON — frontend handles audio via /speak.
+    """
+    image_bytes = await image.read()
+    clinical_text = extract_document_text(image_bytes)
+    summary = summarize_document(clinical_text)
+    return JSONResponse(content={"summary": summary})
+
+
+@app.post("/document/ask")
+async def document_ask(
+    image: UploadFile = File(...),
+    question: str = Form(...),
+    patient_id: str = Form(...),
+):
+    """
+    Takes a photo of a discharge document + a patient question.
+    Returns plain-language answer as JSON — frontend handles audio via /speak.
+    """
+    image_bytes = await image.read()
+    clinical_text = extract_document_text(image_bytes)
+    answer = answer_question(question, clinical_text, db)
+    excerpt = clinical_text[:300].strip()
+    return JSONResponse(content={"answer": answer, "relevant_excerpt": excerpt})
+
+
+@app.post("/log-dose")
+async def log_dose(request: LogDoseRequest):
+    """Records a dose to dose_log so /verify can catch too-soon re-doses."""
+    import datetime
+    db.dose_log.insert_one({
+        "patient_id": request.patient_id,
+        "drug_name": request.medication_name,
+        "logged_at": datetime.datetime.now(datetime.UTC),
+    })
+    return JSONResponse(content={"status": "logged"})
 
 
 @app.get("/health")
