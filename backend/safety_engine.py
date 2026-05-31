@@ -22,7 +22,7 @@ def _normalize_drug(name: str) -> str:
     cleaned = re.sub(r'\s*\d[\d.,]*\s*(?:mg|mcg|ml|g|iu|units?)\b.*', '', name, flags=re.IGNORECASE).strip()
     cleaned = re.sub(r'\b(tablets?|capsules?|oral|solution|injection|hcl|hydrochloride)\b.*', '', cleaned, flags=re.IGNORECASE).strip()
     lower = cleaned.lower()
-    return _ALIASES.get(lower, cleaned) or name
+    return _ALIASES.get(lower, cleaned.title()) or name
 
 
 def _fmt_mins(minutes: int) -> str:

@@ -10,7 +10,7 @@
     "drug_name": "Lisinopril",
     "max_single_dose_mg": 40,
     "max_daily_dose_mg": 80,
-    "min_interval_minutes": 720,
+    "min_interval_minutes": 1440,
     "standard_form": "tablet"
   },
   {
