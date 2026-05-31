@@ -67,21 +67,13 @@ Result: BLOCKED — A dose was already logged. Minimum re-dose interval is 8 hou
 
 ## Screenshots
 
-> Add screenshots of the app here to showcase the UI and demo flows.
+> Verified Present — Lisinopril 10mg scan. No safety concerns detected.
 >
-> <!-- To add a screenshot: upload your image to the `screenshots/` folder and reference it below -->
+> ![Verified Present — Lisinopril 10mg](screenshot-verified-present-lisinopril.png)
 >
-> | Screen | Description |
-> |--------|-------------|
-> | ![Scan Screen](screenshots/scan-screen.png) | Camera scan view — patient points phone at pill tray |
-> | ![Safety Alert](screenshots/safety-alert.png) | Red BLOCKED alert with spoken explanation |
-> | ![Clear Result](screenshots/clear-result.png) | Green CLEAR confirmation after passing all checks |
-> | ![Q&A Chat](screenshots/qa-chat.png) | Patient Q&A interface for asking medication questions |
-> | ![Home Screen](screenshots/home-screen.png) | OculusMD home screen — patient dashboard with active conditions, prescriptions, and quick actions |
->
-> > **Note:** Replace the placeholder paths above with actual screenshot files. Upload images to a `screenshots/` folder in the repo root and update the paths accordingly.
+> > Blocked — Critical drug-drug interaction: Metronidazole + Warfarin. Severe risk of fatal internal hemorrhage.
 > >
-> > ---
+> > ![Blocked — Metronidazole + Warfarin critical interaction](screenshot-blocked-metronidazole-warfarin.png)
 
 ## How It Works
 
