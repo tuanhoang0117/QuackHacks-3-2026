@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
+import Markdown from 'react-native-markdown-display';
 import { DocumentAskResponse } from '../types';
 import { askDocumentQuestion, getDocumentSummary, uploadDocumentForText } from '../services/documentApi';
 
@@ -372,7 +373,7 @@ export default function DocumentScreen() {
           {qaHistory.map(({ q, a }, i) => (
             <View key={i} style={styles.answerCard}>
               <Text style={styles.answerQuestion}>Q: {q}</Text>
-              <Text style={styles.answerText}>{a.answer}</Text>
+              <Markdown style={markdownStyles}>{a.answer}</Markdown>
               {a.relevant_excerpt ? (
                 <Text style={styles.answerExcerpt}>"{a.relevant_excerpt}"</Text>
               ) : null}
@@ -388,6 +389,15 @@ export default function DocumentScreen() {
     </SafeAreaView>
   );
 }
+
+const markdownStyles = {
+  body: { fontSize: 14, color: Colors.text, lineHeight: 22 },
+  strong: { fontWeight: '700' as const },
+  bullet_list: { marginVertical: 4 },
+  ordered_list: { marginVertical: 4 },
+  list_item: { marginBottom: 2 },
+  paragraph: { marginVertical: 2 },
+};
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
