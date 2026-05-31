@@ -77,6 +77,7 @@ Result: BLOCKED — A dose was already logged. Minimum re-dose interval is 8 hou
 > | ![Safety Alert](screenshots/safety-alert.png) | Red BLOCKED alert with spoken explanation |
 > | ![Clear Result](screenshots/clear-result.png) | Green CLEAR confirmation after passing all checks |
 > | ![Q&A Chat](screenshots/qa-chat.png) | Patient Q&A interface for asking medication questions |
+> | ![Home Screen](screenshots/home-screen.png) | OculusMD home screen — patient dashboard with active conditions, prescriptions, and quick actions |
 >
 > > **Note:** Replace the placeholder paths above with actual screenshot files. Upload images to a `screenshots/` folder in the repo root and update the paths accordingly.
 > >
