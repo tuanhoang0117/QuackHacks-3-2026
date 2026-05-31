@@ -10,8 +10,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { DocumentAskResponse } from '../types';
-import { askDocumentQuestion, getDocumentSummary, speakText } from '../services/documentApi';
+import { askDocumentQuestion, getDocumentSummary } from '../services/documentApi';
 import { DEMO_MODE } from '../services/api';
+import { MOCK_SUMMARY } from '../mocks/mockDocumentResponses';
 
 type Phase = 'capture' | 'processing' | 'ready' | 'error';
 
@@ -31,6 +32,7 @@ export default function DocumentScreen() {
   const [phase, setPhase] = useState<Phase>('capture');
   const [showCamera, setShowCamera] = useState(false);
   const [docImageUri, setDocImageUri] = useState<string>('');
+  const [clinicalText, setClinicalText] = useState<string>('');
   const [processingStep, setProcessingStep] = useState(0);
   const [question, setQuestion] = useState('');
   const [qaHistory, setQaHistory] = useState<{ q: string; a: DocumentAskResponse }[]>([]);
@@ -64,14 +66,10 @@ export default function DocumentScreen() {
     const stopAnim = runProcessingAnimation();
 
     try {
-      // In DEMO_MODE, skip real API call — doc is pre-indexed
-      if (!DEMO_MODE) {
-        await getDocumentSummary({ imageUri: uri, patientId: 'PT-9942' });
-      } else {
-        await new Promise(res => setTimeout(res, 2200));
-      }
+      await new Promise(res => setTimeout(res, 2200));
       stopAnim();
       setProcessingStep(PROCESSING_STEPS.length - 1);
+      setClinicalText(MOCK_SUMMARY.summary);
       setPhase('ready');
     } catch {
       stopAnim();
@@ -119,16 +117,12 @@ export default function DocumentScreen() {
     setQuestion('');
     setIsAsking(true);
     try {
-      const response = await askDocumentQuestion({
-        imageUri: docImageUri || DEMO_IMAGE_URI,
-        question: q,
-        patientId: 'PT-9942',
-      });
-      setQaHistory(prev => [{ q, a: response }, ...prev]);
-
-      // Auto-play answer
+      const { answer, relevant_excerpt, stop } = await askDocumentQuestion(
+        { question: q, clinicalContext: clinicalText, patientId: 'PT-9942' },
+        () => setIsSpeaking(false)
+      );
+      setQaHistory(prev => [{ q, a: { answer, relevant_excerpt } }, ...prev]);
       setIsSpeaking(true);
-      const stop = await speakText(response.answer, () => setIsSpeaking(false));
       stopAudioRef.current = stop;
     } catch {
       // show error inline
@@ -139,27 +133,27 @@ export default function DocumentScreen() {
     } finally {
       setIsAsking(false);
     }
-  }, [question, isAsking, docImageUri, stopAudio]);
+  }, [question, isAsking, clinicalText, stopAudio]);
 
   const handleSummary = useCallback(async () => {
     if (isSpeaking) { stopAudio(); return; }
     setIsSpeaking(true);
     try {
-      const { summary } = await getDocumentSummary({
-        imageUri: docImageUri || DEMO_IMAGE_URI,
-        patientId: 'PT-9942',
-      });
-      const stop = await speakText(summary, () => setIsSpeaking(false));
+      const { stop } = await getDocumentSummary(
+        { clinicalText },
+        () => setIsSpeaking(false)
+      );
       stopAudioRef.current = stop;
     } catch {
       setIsSpeaking(false);
     }
-  }, [isSpeaking, docImageUri, stopAudio]);
+  }, [isSpeaking, clinicalText, stopAudio]);
 
   const handleReset = useCallback(() => {
     stopAudio();
     setPhase('capture');
     setDocImageUri('');
+    setClinicalText('');
     setQaHistory([]);
     setQuestion('');
     setProcessingStep(0);
@@ -299,7 +293,6 @@ export default function DocumentScreen() {
             <Ionicons name={isSpeaking ? 'stop-circle' : 'volume-high'} size={20} color={Colors.white} />
             <Text style={styles.summaryButtonText}>
               {isSpeaking ? 'Stop Audio' : 'Hear Full Summary'}
-              {DEMO_MODE ? ' (Device TTS)' : ' (ElevenLabs)'}
             </Text>
           </TouchableOpacity>
 
