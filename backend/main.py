@@ -181,6 +181,18 @@ async def ask(request: AskRequest):
     )
 
 
+@app.post("/document/ocr")
+async def document_ocr(
+    image: UploadFile = File(...),
+    patient_id: str = Form(...),
+):
+    """OCR only — no Gemini summarization. Fast per-page text extraction."""
+    image_bytes = await image.read()
+    mime_type = image.content_type or "image/jpeg"
+    clinical_text = extract_document_text(image_bytes, mime_type)
+    return JSONResponse(content={"clinical_text": clinical_text})
+
+
 @app.post("/document/summary")
 async def document_summary(
     image: UploadFile = File(...),

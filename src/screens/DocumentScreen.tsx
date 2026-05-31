@@ -28,7 +28,7 @@ export default function DocumentScreen() {
   const [showCamera, setShowCamera] = useState(false);
   const [pages, setPages] = useState<DocumentPage[]>([]);
   const [clinicalText, setClinicalText] = useState<string>('');
-  const [summaryText, setSummaryText] = useState<string>('');
+  const [errorDetail, setErrorDetail] = useState<string>('');
   const [processingStep, setProcessingStep] = useState(0);
   const [processingTotal, setProcessingTotal] = useState(0);
   const [question, setQuestion] = useState('');
@@ -51,18 +51,16 @@ export default function DocumentScreen() {
     setProcessingTotal(pagesToProcess.length);
     try {
       const texts: string[] = [];
-      const summaries: string[] = [];
       for (let i = 0; i < pagesToProcess.length; i++) {
         setProcessingStep(i);
-        const { clinicalText, summary } = await uploadDocumentForText(pagesToProcess[i].uri, pagesToProcess[i].mimeType);
-        texts.push(clinicalText);
-        summaries.push(summary);
+        const text = await uploadDocumentForText(pagesToProcess[i].uri, pagesToProcess[i].mimeType);
+        texts.push(text);
       }
       setClinicalText(texts.join('\n\n---\n\n'));
-      setSummaryText(summaries.join('\n\n'));
       setProcessingStep(pagesToProcess.length);
       setPhase('ready');
-    } catch {
+    } catch (e) {
+      setErrorDetail(e instanceof Error ? e.message : String(e));
       setPhase('error');
     }
   }, []);
@@ -149,21 +147,21 @@ export default function DocumentScreen() {
     setIsSpeaking(true);
     try {
       const { stop } = await getDocumentSummary(
-        { clinicalText: summaryText },
+        { clinicalText },
         () => setIsSpeaking(false)
       );
       stopAudioRef.current = stop;
     } catch {
       setIsSpeaking(false);
     }
-  }, [isSpeaking, summaryText, stopAudio]);
+  }, [isSpeaking, clinicalText, stopAudio]);
 
   const handleReset = useCallback(() => {
     stopAudio();
     setPhase('capture');
     setPages([]);
     setClinicalText('');
-    setSummaryText('');
+    setErrorDetail('');
     setQaHistory([]);
     setQuestion('');
     setProcessingStep(0);
@@ -212,7 +210,9 @@ export default function DocumentScreen() {
       <View style={styles.center}>
         <Ionicons name="alert-circle" size={52} color={Colors.blocked} />
         <Text style={styles.errorTitle}>Processing Failed</Text>
-        <Text style={styles.errorDetail}>Could not read the document. Try again with better lighting.</Text>
+        <Text style={styles.errorDetail}>
+          {errorDetail || 'Could not read the document. Please try again.'}
+        </Text>
         <TouchableOpacity style={styles.primaryButton} onPress={handleReset}>
           <Text style={styles.primaryButtonText}>Try Again</Text>
         </TouchableOpacity>
