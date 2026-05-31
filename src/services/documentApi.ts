@@ -49,18 +49,18 @@ export async function uploadDocumentForText(uri: string, mimeType: string): Prom
   } as unknown as Blob);
   form.append('patient_id', 'PT-9942');
 
-  const response = await fetch(`${API_BASE_URL}/document/summary`, {
+  const response = await fetch(`${API_BASE_URL}/document/ocr`, {
     method: 'POST',
     body: form,
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new Error(`/document/summary error ${response.status}: ${text}`);
+    throw new Error(`/document/ocr error ${response.status}: ${text}`);
   }
 
   const data = await response.json();
-  return (data.clinical_text ?? data.summary ?? '') as string;
+  return (data.clinical_text ?? '') as string;
 }
 
 export async function askDocumentQuestion(
