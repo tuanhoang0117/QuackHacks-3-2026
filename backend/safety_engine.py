@@ -1,8 +1,38 @@
 import hashlib
 import json
+import re
 import datetime
 from typing import Literal
 from pydantic import BaseModel
+
+# Common label variants → canonical DB name
+_ALIASES: dict[str, str] = {
+    "warfarin sodium": "Warfarin",
+    "coumadin": "Warfarin",
+    "flagyl": "Metronidazole",
+    "prinivil": "Lisinopril",
+    "zestril": "Lisinopril",
+    "sudafed": "Pseudoephedrine",
+    "pseudoephedrine hcl": "Pseudoephedrine",
+    "pseudoephedrine hydrochloride": "Pseudoephedrine",
+}
+
+def _normalize_drug(name: str) -> str:
+    """Strip dosage/form suffixes and resolve brand/salt variants to canonical DB names."""
+    cleaned = re.sub(r'\s*\d[\d.,]*\s*(?:mg|mcg|ml|g|iu|units?)\b.*', '', name, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r'\b(tablets?|capsules?|oral|solution|injection|hcl|hydrochloride)\b.*', '', cleaned, flags=re.IGNORECASE).strip()
+    lower = cleaned.lower()
+    return _ALIASES.get(lower, cleaned) or name
+
+
+def _fmt_mins(minutes: int) -> str:
+    """Format an integer minute count as a readable string for TTS."""
+    h, m = divmod(minutes, 60)
+    if h == 0:
+        return f"{m} minute{'s' if m != 1 else ''}"
+    if m == 0:
+        return f"{h} hour{'s' if h != 1 else ''}"
+    return f"{h} hour{'s' if h != 1 else ''} and {m} minute{'s' if m != 1 else ''}"
 
 
 class SafetyFlag(BaseModel):
@@ -61,7 +91,7 @@ def decide(perception: dict, patient_profile: dict, db, now: datetime.datetime |
     now = now or datetime.datetime.now(datetime.UTC)
     flags: list[SafetyFlag] = []
 
-    observed = [i["name"] for i in perception["identified_items"]]
+    observed = [_normalize_drug(i["name"]) for i in perception["identified_items"]]
     profile_meds = patient_profile.get("discharge_prescriptions", [])
     candidates = sorted(set(observed + profile_meds))
 
@@ -122,8 +152,8 @@ def decide(perception: dict, patient_profile: dict, db, now: datetime.datetime |
                         drugs_involved=[drug],
                         mechanism=(
                             f"A dose of {drug} was already logged "
-                            f"{int(minutes_since)} minutes ago. "
-                            f"The minimum re-dose interval is {dosage['min_interval_minutes']} minutes. "
+                            f"{_fmt_mins(int(minutes_since))} ago. "
+                            f"The minimum re-dose interval is {_fmt_mins(dosage['min_interval_minutes'])}. "
                             "Administering again this soon risks dangerous accumulation."
                         ),
                     ))
