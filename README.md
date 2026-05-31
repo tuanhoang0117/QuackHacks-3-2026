@@ -69,11 +69,11 @@ Result: BLOCKED — A dose was already logged. Minimum re-dose interval is 8 hou
 
 > Verified Present — Lisinopril 10mg scan. No safety concerns detected.
 >
-> ![Verified Present — Lisinopril 10mg](screenshot-verified-present-lisinopril.png)
+> <img src="screenshot-verified-present-lisinopril.png" width="300" alt="Verified Present — Lisinopril 10mg">
 >
 > > Blocked — Critical drug-drug interaction: Metronidazole + Warfarin. Severe risk of fatal internal hemorrhage.
 > >
-> > ![Blocked — Metronidazole + Warfarin critical interaction](screenshot-blocked-metronidazole-warfarin.png)
+> > <img src="screenshot-blocked-metronidazole-warfarin.png" width="300" alt="Blocked — Metronidazole + Warfarin critical interaction">
 
 ## How It Works
 
