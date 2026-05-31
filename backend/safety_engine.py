@@ -101,8 +101,8 @@ def decide(perception: dict, patient_profile: dict, db, now: datetime.datetime |
     for drug in candidates:
         db.dosages.find_one({"drug_name": drug})  # no-op for now; extend when perception carries dose
 
-    # 4) Too-soon / double-dose
-    for drug in candidates:
+    # 4) Too-soon / double-dose — only for physically scanned drugs, not discharge document refs
+    for drug in observed:
         last = db.dose_log.find_one(
             {"patient_id": patient_profile["patient_id"], "drug_name": drug},
             sort=[("logged_at", -1)],

@@ -33,13 +33,8 @@ ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  
 
 @app.on_event("startup")
 def reset_demo_state():
-    """Wipes and re-seeds dose_log on every server start so each demo run is clean."""
+    """Wipes dose_log on every server start so each demo run begins with a clean slate."""
     db.dose_log.drop()
-    db.dose_log.insert_one({
-        "patient_id": "PT-9942",
-        "drug_name": "Warfarin",
-        "logged_at": datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=47),
-    })
 
 
 # ---------- Request/Response models ----------
@@ -133,9 +128,10 @@ async def verify(
     response_data = result.model_dump()
     response_data["solana_tx"] = solana_tx
 
-    # Log this dose to dose_log on any non-blocked clean verification
+    # Log only camera-observed drugs — not every drug mentioned in the discharge document
     if result.verification_successful:
-        for drug in result.matched_medications:
+        observed_drugs = [i["name"] for i in perception["identified_items"]]
+        for drug in observed_drugs:
             db.dose_log.insert_one({
                 "patient_id": patient_id,
                 "drug_name": drug,
