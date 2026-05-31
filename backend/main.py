@@ -31,6 +31,17 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # default: Rachel
 
 
+@app.on_event("startup")
+def reset_demo_state():
+    """Wipes and re-seeds dose_log on every server start so each demo run is clean."""
+    db.dose_log.drop()
+    db.dose_log.insert_one({
+        "patient_id": "PT-9942",
+        "drug_name": "Warfarin",
+        "logged_at": datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=47),
+    })
+
+
 # ---------- Request/Response models ----------
 
 class SpeakRequest(BaseModel):
