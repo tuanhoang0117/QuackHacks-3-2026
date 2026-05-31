@@ -46,7 +46,7 @@ export default function AppNavigator() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: 'MedsCrossLink' }}
+        options={{ title: 'oculusMD' }}
       />
       <Tab.Screen
         name="Documents"

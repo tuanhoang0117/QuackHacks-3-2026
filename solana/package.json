@@ -1,5 +1,5 @@
 {
-  "name": "medscrosslink-solana",
+  "name": "oculusmd-solana",
   "version": "1.0.0",
   "scripts": {
     "log": "ts-node solana_logger.ts"

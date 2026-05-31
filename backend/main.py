@@ -15,7 +15,7 @@ from chat_agent import summarize_document, answer_question
 
 load_dotenv()
 
-app = FastAPI(title="MedsCrossLink AI", version="2.0")
+app = FastAPI(title="oculusMD", version="2.0")
 
 app.add_middleware(
     CORSMiddleware,

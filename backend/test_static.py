@@ -101,7 +101,7 @@ def run_all_demos():
     failed = 0
 
     print("=" * 60)
-    print("MedsCrossLink AI — Static Pipeline Test")
+    print("oculusMD — Static Pipeline Test")
     print("=" * 60)
 
     for key, scenario in DEMO_SCENARIOS.items():
