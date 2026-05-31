@@ -119,9 +119,9 @@ export default function ScanScreen() {
 
   // Camera capture button
   const handleAnalyze = useCallback(async () => {
-    if (!DEMO_MODE) {
-      if (!permission?.granted) { await requestPermission(); return; }
-      if (cameraRef.current) {
+    if (!permission?.granted) { await requestPermission(); return; }
+    if (cameraRef.current) {
+      try {
         const photo = await cameraRef.current.takePictureAsync({ quality: 0.6, exif: false });
         if (photo?.uri) {
           const resized = await ImageManipulator.manipulateAsync(
@@ -132,10 +132,12 @@ export default function ScanScreen() {
           handleCapture(resized.uri);
           return;
         }
+      } catch {
+        // fall through to analysis without image
       }
     }
-    handleCapture('');
-  }, [permission, requestPermission, handleCapture]);
+    runAnalyze('');
+  }, [permission, requestPermission, handleCapture, runAnalyze]);
 
   // Library picker button
   const handlePickImage = useCallback(async () => {
@@ -220,8 +222,8 @@ export default function ScanScreen() {
     }
   }, [result, handleReset]);
 
-  // ── Permission gate (live mode only) ──────────────────────────────────────
-  if (!DEMO_MODE && !permission?.granted) {
+  // ── Permission gate ────────────────────────────────────────────────────────
+  if (!permission?.granted) {
     return (
       <View style={styles.center}>
         {!permission ? (
@@ -488,25 +490,17 @@ export default function ScanScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.cameraContainer}>
-        {DEMO_MODE ? (
-          <View style={styles.demoPlaceholder}>
-            <Ionicons name="scan" size={56} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.demoPlaceholderTitle}>Place Medication in Frame</Text>
-            <Text style={styles.demoPlaceholderSub}>Or select an image below</Text>
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" zoom={0.01}>
+          <View style={styles.cameraFrame}>
+            <View style={styles.cornerTL} />
+            <View style={styles.cornerTR} />
+            <View style={styles.cornerBL} />
+            <View style={styles.cornerBR} />
           </View>
-        ) : (
-          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back">
-            <View style={styles.cameraFrame}>
-              <View style={styles.cornerTL} />
-              <View style={styles.cornerTR} />
-              <View style={styles.cornerBL} />
-              <View style={styles.cornerBR} />
-            </View>
-            <View style={styles.cameraHint}>
-              <Text style={styles.cameraHintText}>Frame pill bottle within the guides</Text>
-            </View>
-          </CameraView>
-        )}
+          <View style={styles.cameraHint}>
+            <Text style={styles.cameraHintText}>Frame pill bottle within the guides</Text>
+          </View>
+        </CameraView>
       </View>
 
       <View style={styles.controls}>
