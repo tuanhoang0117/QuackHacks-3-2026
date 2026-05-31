@@ -187,13 +187,14 @@ async def document_summary(
     patient_id: str = Form(...),
 ):
     """
-    Takes a photo of a discharge document.
-    Returns plain-language summary as JSON — frontend handles audio via /speak.
+    Takes a photo or PDF of a discharge document.
+    Returns extracted clinical_text and a plain-language summary.
     """
     image_bytes = await image.read()
-    clinical_text = extract_document_text(image_bytes)
+    mime_type = image.content_type or "image/jpeg"
+    clinical_text = extract_document_text(image_bytes, mime_type)
     summary = summarize_document(clinical_text)
-    return JSONResponse(content={"summary": summary})
+    return JSONResponse(content={"summary": summary, "clinical_text": clinical_text})
 
 
 @app.post("/document/ask")
@@ -203,11 +204,12 @@ async def document_ask(
     patient_id: str = Form(...),
 ):
     """
-    Takes a photo of a discharge document + a patient question.
+    Takes a photo or PDF of a discharge document + a patient question.
     Returns plain-language answer as JSON — frontend handles audio via /speak.
     """
     image_bytes = await image.read()
-    clinical_text = extract_document_text(image_bytes)
+    mime_type = image.content_type or "image/jpeg"
+    clinical_text = extract_document_text(image_bytes, mime_type)
     answer = answer_question(question, clinical_text, db)
     excerpt = clinical_text[:300].strip()
     return JSONResponse(content={"answer": answer, "relevant_excerpt": excerpt})

@@ -7,12 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { DocumentAskResponse } from '../types';
-import { askDocumentQuestion, getDocumentSummary } from '../services/documentApi';
+import { askDocumentQuestion, getDocumentSummary, uploadDocumentForText } from '../services/documentApi';
 import { DEMO_MODE } from '../services/api';
-import { MOCK_SUMMARY } from '../mocks/mockDocumentResponses';
 
 type Phase = 'capture' | 'processing' | 'ready' | 'error';
 
@@ -32,6 +32,7 @@ export default function DocumentScreen() {
   const [phase, setPhase] = useState<Phase>('capture');
   const [showCamera, setShowCamera] = useState(false);
   const [docImageUri, setDocImageUri] = useState<string>('');
+  const [docMimeType, setDocMimeType] = useState<string>('image/jpeg');
   const [clinicalText, setClinicalText] = useState<string>('');
   const [processingStep, setProcessingStep] = useState(0);
   const [question, setQuestion] = useState('');
@@ -58,18 +59,19 @@ export default function DocumentScreen() {
     setIsSpeaking(false);
   }, []);
 
-  const processDocument = useCallback(async (uri: string) => {
+  const processDocument = useCallback(async (uri: string, mimeType: string = 'image/jpeg') => {
     setDocImageUri(uri);
+    setDocMimeType(mimeType);
     setShowCamera(false);
     setPhase('processing');
     setProcessingStep(0);
     const stopAnim = runProcessingAnimation();
 
     try {
-      await new Promise(res => setTimeout(res, 2200));
+      const text = await uploadDocumentForText(uri, mimeType);
       stopAnim();
       setProcessingStep(PROCESSING_STEPS.length - 1);
-      setClinicalText(MOCK_SUMMARY.summary);
+      setClinicalText(text);
       setPhase('ready');
     } catch {
       stopAnim();
@@ -107,7 +109,17 @@ export default function DocumentScreen() {
       quality: 0.8,
     });
     if (result.canceled || !result.assets[0]?.uri) return;
-    await processDocument(result.assets[0].uri);
+    await processDocument(result.assets[0].uri, 'image/jpeg');
+  }, [processDocument]);
+
+  const handlePickFile = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    await processDocument(asset.uri, asset.mimeType ?? 'application/pdf');
   }, [processDocument]);
 
   const handleAsk = useCallback(async () => {
@@ -153,6 +165,7 @@ export default function DocumentScreen() {
     stopAudio();
     setPhase('capture');
     setDocImageUri('');
+    setDocMimeType('image/jpeg');
     setClinicalText('');
     setQaHistory([]);
     setQuestion('');
@@ -242,7 +255,12 @@ export default function DocumentScreen() {
 
           <TouchableOpacity style={styles.secondaryButton} onPress={handleUpload} activeOpacity={0.85}>
             <Ionicons name="image-outline" size={20} color={Colors.primary} />
-            <Text style={styles.secondaryButtonText}>Upload from Library</Text>
+            <Text style={styles.secondaryButtonText}>Upload from Photo Library</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryButton} onPress={handlePickFile} activeOpacity={0.85}>
+            <Ionicons name="document-outline" size={20} color={Colors.primary} />
+            <Text style={styles.secondaryButtonText}>Upload PDF from Files</Text>
           </TouchableOpacity>
 
           {DEMO_MODE && (
@@ -275,12 +293,18 @@ export default function DocumentScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Document preview */}
-          {docImageUri ? (
+          {docImageUri && docMimeType !== 'application/pdf' ? (
             <Image source={{ uri: docImageUri }} style={styles.docThumb} resizeMode="cover" />
           ) : (
             <View style={styles.docThumbPlaceholder}>
-              <Ionicons name="document-text" size={40} color={Colors.primary} />
-              <Text style={styles.docThumbPlaceholderText}>Marcus Vance — Discharge Summary</Text>
+              <Ionicons
+                name={docMimeType === 'application/pdf' ? 'document' : 'document-text'}
+                size={40}
+                color={Colors.primary}
+              />
+              <Text style={styles.docThumbPlaceholderText}>
+                {docMimeType === 'application/pdf' ? 'PDF Document Loaded' : 'Document Ready'}
+              </Text>
             </View>
           )}
 

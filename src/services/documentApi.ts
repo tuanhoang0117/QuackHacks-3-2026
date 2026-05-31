@@ -36,6 +36,32 @@ async function playAudioBlob(blob: Blob, onDone: () => void): Promise<() => void
   return () => { sound.unloadAsync(); onDone(); };
 }
 
+// POST /document/summary — uploads image or PDF, returns extracted clinical text
+export async function uploadDocumentForText(uri: string, mimeType: string): Promise<string> {
+  if (DEMO_MODE) return MOCK_SUMMARY.summary;
+
+  const form = new FormData();
+  form.append('image', {
+    uri,
+    type: mimeType,
+    name: mimeType === 'application/pdf' ? 'document.pdf' : 'document.jpg',
+  } as unknown as Blob);
+  form.append('patient_id', 'PT-9942');
+
+  const response = await fetch(`${API_BASE_URL}/document/summary`, {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`/document/summary error ${response.status}: ${text}`);
+  }
+
+  const data = await response.json();
+  return (data.clinical_text ?? data.summary ?? '') as string;
+}
+
 export async function askDocumentQuestion(
   payload: AskPayload,
   onDone: () => void
