@@ -41,6 +41,19 @@ Output only what you observe, conforming exactly to the requested JSON schema.
 """
 
 
+def extract_document_text(image_bytes: bytes) -> str:
+    """OCRs a document image and returns the full plain text."""
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[
+            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+            "Extract all text from this medical document. Return the complete text verbatim, preserving structure.",
+        ],
+    )
+    return response.text
+
+
 def extract_observations(image_bytes: bytes, clinical_paper_text: str) -> dict:
     """
     Sends image + clinical text to Gemini 2.5 Flash for extraction only.
