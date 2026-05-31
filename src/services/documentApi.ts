@@ -74,24 +74,37 @@ export async function askDocumentQuestion(
     return { answer, relevant_excerpt, stop: () => { Speech.stop(); onDone(); } };
   }
 
-  const response = await fetch(`${API_BASE_URL}/ask`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      question: payload.question,
-      clinical_context: payload.clinicalContext,
-      patient_id: payload.patientId,
-    }),
+  const body = JSON.stringify({
+    question: payload.question,
+    clinical_context: payload.clinicalContext,
+    patient_id: payload.patientId,
   });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`/ask error ${response.status}: ${text}`);
+  // Try ElevenLabs audio first; fall back to text-only + expo-speech
+  try {
+    const response = await fetch(`${API_BASE_URL}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (!response.ok) throw new Error(`/ask ${response.status}`);
+    const answer = response.headers.get('X-Answer-Text') ?? '';
+    const stop = await playAudioBlob(await response.blob(), onDone);
+    return { answer, relevant_excerpt: '', stop };
+  } catch {
+    const textRes = await fetch(`${API_BASE_URL}/ask/text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (!textRes.ok) {
+      const msg = await textRes.text().catch(() => '');
+      throw new Error(`/ask/text ${textRes.status}: ${msg}`);
+    }
+    const { answer } = await textRes.json() as { answer: string };
+    Speech.speak(answer, { rate: 0.88, onDone, onError: onDone, onStopped: onDone });
+    return { answer, relevant_excerpt: '', stop: () => { Speech.stop(); onDone(); } };
   }
-
-  const answer = response.headers.get('X-Answer-Text') ?? '';
-  const stop = await playAudioBlob(await response.blob(), onDone);
-  return { answer, relevant_excerpt: '', stop };
 }
 
 export async function getDocumentSummary(
@@ -105,18 +118,31 @@ export async function getDocumentSummary(
     return { summary, stop: () => { Speech.stop(); onDone(); } };
   }
 
-  const response = await fetch(`${API_BASE_URL}/summarize`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clinical_text: payload.clinicalText }),
-  });
+  const body = JSON.stringify({ clinical_text: payload.clinicalText });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`/summarize error ${response.status}: ${text}`);
+  // Try ElevenLabs audio first; fall back to text-only + expo-speech
+  try {
+    const response = await fetch(`${API_BASE_URL}/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (!response.ok) throw new Error(`/summarize ${response.status}`);
+    const summary = response.headers.get('X-Summary-Text') ?? payload.clinicalText;
+    const stop = await playAudioBlob(await response.blob(), onDone);
+    return { summary, stop };
+  } catch {
+    const textRes = await fetch(`${API_BASE_URL}/summarize/text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (!textRes.ok) {
+      const msg = await textRes.text().catch(() => '');
+      throw new Error(`/summarize/text ${textRes.status}: ${msg}`);
+    }
+    const { summary } = await textRes.json() as { summary: string };
+    Speech.speak(summary, { rate: 0.88, onDone, onError: onDone, onStopped: onDone });
+    return { summary, stop: () => { Speech.stop(); onDone(); } };
   }
-
-  const summary = response.headers.get('X-Summary-Text') ?? payload.clinicalText;
-  const stop = await playAudioBlob(await response.blob(), onDone);
-  return { summary, stop };
 }

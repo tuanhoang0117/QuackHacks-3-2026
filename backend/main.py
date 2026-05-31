@@ -181,6 +181,20 @@ async def ask(request: AskRequest):
     )
 
 
+@app.post("/ask/text")
+async def ask_text(request: AskRequest):
+    """Text-only Q&A — no ElevenLabs. Fallback when TTS is unavailable."""
+    answer = answer_question(request.question, request.clinical_context, db)
+    return JSONResponse(content={"answer": answer})
+
+
+@app.post("/summarize/text")
+async def summarize_text(request: SummarizeRequest):
+    """Text-only summary — no ElevenLabs. Fallback when TTS is unavailable."""
+    summary = summarize_document(request.clinical_text)
+    return JSONResponse(content={"summary": summary})
+
+
 @app.post("/document/ocr")
 async def document_ocr(
     image: UploadFile = File(...),
