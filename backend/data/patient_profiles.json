@@ -13,6 +13,7 @@
     ],
     "past_surgical_history": ["None"],
     "allergies": [{ "substance": "Latex", "reaction": "Contact Dermatitis" }],
-    "active_prescriptions_pre_admission": ["Lisinopril 10mg daily"]
+    "active_prescriptions_pre_admission": ["Lisinopril 10mg daily"],
+    "discharge_prescriptions": ["Warfarin", "Lisinopril"]
   }
 ]

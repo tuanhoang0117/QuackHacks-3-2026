@@ -16,7 +16,6 @@ import { submitScan, fetchSpeechAudioUri, DEMO_MODE } from '../services/api';
 import { identifyMedication } from '../services/medicationRecognition';
 import { saveDose, getDoses } from '../services/doseLog';
 import { DosingInfo, DOSING_SCHEDULE, findDosingInfo, findDosingKey, formatDuration } from '../constants/dosing';
-import { MOCK_SUMMARY } from '../mocks/mockDocumentResponses';
 import VerdictBanner from '../components/VerdictBanner';
 import SafetyFlagCard from '../components/SafetyFlagCard';
 
@@ -123,7 +122,7 @@ export default function ScanScreen() {
         : DEMO_CYCLE[demoCycleRef.current % DEMO_CYCLE.length];
       if (!DEMO_MODE || !imageUri) demoCycleRef.current += 1;
       const res = await submitScan(
-        { imageUri, clinicalText: MOCK_SUMMARY.summary, patientId: 'PT-9942' },
+        { imageUri, clinicalText: '', patientId: 'PT-9942' },
         scenario
       );
       stopAnimation();

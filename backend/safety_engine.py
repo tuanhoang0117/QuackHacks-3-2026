@@ -62,7 +62,8 @@ def decide(perception: dict, patient_profile: dict, db, now: datetime.datetime |
     flags: list[SafetyFlag] = []
 
     observed = [i["name"] for i in perception["identified_items"]]
-    candidates = sorted(set(observed + perception["document_medications"]))
+    profile_meds = patient_profile.get("discharge_prescriptions", [])
+    candidates = sorted(set(observed + profile_meds))
 
     # 1) Drug-to-drug interactions (pairwise)
     for a in candidates:
@@ -152,7 +153,7 @@ def decide(perception: dict, patient_profile: dict, db, now: datetime.datetime |
 
     return ReconciliationResult(
         verification_successful=success,
-        matched_medications=candidates,
+        matched_medications=sorted(observed),
         safety_flags=flags,
         requires_human_review=needs_review,
         review_reason=review_reason,
