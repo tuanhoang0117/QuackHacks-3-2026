@@ -3,9 +3,9 @@ import { ReconciliationResult, SpeakRequest, DemoScenario } from '../types';
 import { MOCK_SCENARIOS } from '../mocks/mockScenarios';
 
 // Flip to false when Track B's FastAPI server is running at API_BASE_URL
-export const DEMO_MODE = true;
+export const DEMO_MODE = false;
 
-export const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = 'http://172.20.10.3:8000';
 
 export interface ScanPayload {
   imageUri: string;     // local URI from CameraView / ImageManipulator
@@ -44,6 +44,16 @@ export async function submitScan(
   }
 
   return response.json() as Promise<ReconciliationResult>;
+}
+
+// DELETE /log-dose/:patient_id  — wipes the backend dose_log for the patient (called on app launch)
+export async function clearBackendDoses(patientId: string): Promise<void> {
+  if (DEMO_MODE) return;
+  try {
+    await fetch(`${API_BASE_URL}/log-dose/${patientId}`, { method: 'DELETE' });
+  } catch {
+    // Non-fatal — backend may not be reachable
+  }
 }
 
 // POST /log-dose  — informs the backend dose_log so /verify can catch too_soon on next scan

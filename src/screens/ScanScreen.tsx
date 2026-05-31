@@ -13,7 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { ReconciliationResult, DemoScenario } from '../types';
 import { submitScan, fetchSpeechAudioUri, DEMO_MODE } from '../services/api';
-import { saveDose } from '../services/doseLog';
+import { identifyMedication } from '../services/medicationRecognition';
+import { saveDose, getDoses } from '../services/doseLog';
+import { DosingInfo, DOSING_SCHEDULE, findDosingInfo, findDosingKey, formatDuration } from '../constants/dosing';
+import { MOCK_SUMMARY } from '../mocks/mockDocumentResponses';
 import VerdictBanner from '../components/VerdictBanner';
 import SafetyFlagCard from '../components/SafetyFlagCard';
 
@@ -55,6 +58,14 @@ export default function ScanScreen() {
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [isSavingDose, setIsSavingDose] = useState(false);
 
+  interface DosingStatus {
+    info: DosingInfo;
+    minutesSince: number | null;
+    minutesRemaining: number | null;
+    tooSoon: boolean;
+  }
+  const [dosingStatuses, setDosingStatuses] = useState<DosingStatus[]>([]);
+
   // Detection animation values
   const scanLineAnim   = useRef(new Animated.Value(0)).current;
   const boxOpacityAnim = useRef(new Animated.Value(0)).current;
@@ -79,6 +90,27 @@ export default function ScanScreen() {
     setIsSpeaking(false);
   }, []);
 
+  const computeDosingStatuses = useCallback(async (meds: string[]) => {
+    const allDoses = await getDoses();
+    const now = new Date();
+    const statuses: DosingStatus[] = [];
+    for (const med of meds) {
+      const info = findDosingInfo(med);
+      if (!info) continue;
+      const key = findDosingKey(info);
+      const lastEntry = allDoses.find(d => d.medication_name.toLowerCase().includes(key));
+      const lastTaken = lastEntry ? new Date(lastEntry.timestamp) : null;
+      const minutesSince = lastTaken ? Math.floor((now.getTime() - lastTaken.getTime()) / 60000) : null;
+      const intervalMinutes = info.intervalHours * 60;
+      const minutesRemaining =
+        minutesSince !== null && minutesSince < intervalMinutes
+          ? intervalMinutes - minutesSince
+          : null;
+      statuses.push({ info, minutesSince, minutesRemaining, tooSoon: minutesRemaining !== null });
+    }
+    setDosingStatuses(statuses);
+  }, []);
+
   // Core analysis: runs after detection animation completes
   const runAnalyze = useCallback(async (imageUri: string) => {
     setPhase('loading');
@@ -86,20 +118,26 @@ export default function ScanScreen() {
     setLoadingStep(0);
     const stopAnimation = runLoadingAnimation();
     try {
-      const scenario = DEMO_CYCLE[demoCycleRef.current % DEMO_CYCLE.length];
-      demoCycleRef.current += 1;
+      const scenario = (DEMO_MODE && imageUri)
+        ? await identifyMedication(imageUri)
+        : DEMO_CYCLE[demoCycleRef.current % DEMO_CYCLE.length];
+      if (!DEMO_MODE || !imageUri) demoCycleRef.current += 1;
       const res = await submitScan(
-        { imageUri, clinicalText: '', patientId: 'PT-9942' },
+        { imageUri, clinicalText: MOCK_SUMMARY.summary, patientId: 'PT-9942' },
         scenario
       );
       stopAnimation();
       setResult(res);
       setPhase('result');
-    } catch {
+      if (res.matched_medications.length > 0) {
+        computeDosingStatuses(res.matched_medications);
+      }
+    } catch (err) {
+      console.log('[runAnalyze] Error:', err);
       stopAnimation();
       setPhase('error');
     }
-  }, [runLoadingAnimation]);
+  }, [runLoadingAnimation, computeDosingStatuses]);
 
   // Detection animation → then analysis
   const handleCapture = useCallback((uri: string) => {
@@ -193,6 +231,7 @@ export default function ScanScreen() {
     setResult(null);
     setCapturedImageUri('');
     setLoadingStep(0);
+    setDosingStatuses([]);
   }, [stopAudio]);
 
   const handleConfirmTaken = useCallback(async () => {
@@ -396,6 +435,38 @@ export default function ScanScreen() {
               ))
             )}
           </View>
+
+          {dosingStatuses.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Dosing Schedule</Text>
+              {dosingStatuses.map((ds, i) => (
+                <View key={i} style={styles.dosingCard}>
+                  <Text style={styles.dosingMedName}>{ds.info.displayName}</Text>
+                  <Text style={styles.dosingInstructions}>{ds.info.instructions}</Text>
+                  <View style={styles.dosingRow}>
+                    <Text style={styles.dosingLabel}>Last taken:</Text>
+                    <Text style={styles.dosingValue}>
+                      {ds.minutesSince !== null
+                        ? `${formatDuration(ds.minutesSince)} ago`
+                        : 'No prior dose on record'}
+                    </Text>
+                  </View>
+                  <View style={[styles.dosingStatus, ds.tooSoon ? styles.dosingStatusWarn : styles.dosingStatusOk]}>
+                    <Ionicons
+                      name={ds.tooSoon ? 'warning' : 'checkmark-circle'}
+                      size={14}
+                      color={ds.tooSoon ? '#E65100' : Colors.verified}
+                    />
+                    <Text style={[styles.dosingStatusText, { color: ds.tooSoon ? '#E65100' : Colors.verified }]}>
+                      {ds.tooSoon
+                        ? `TOO SOON — next dose in ${formatDuration(ds.minutesRemaining!)}`
+                        : 'OK to administer now'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           <TouchableOpacity
             style={[styles.audioButton, isSpeaking && styles.audioButtonActive]}
@@ -709,4 +780,18 @@ const styles = StyleSheet.create({
   modalConfirmText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
   modalCancelButton: { paddingVertical: 10 },
   modalCancelText: { fontSize: 14, color: Colors.textSecondary },
+
+  dosingCard: { gap: 6, paddingTop: 4 },
+  dosingMedName: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  dosingInstructions: { fontSize: 12, color: Colors.textSecondary, marginBottom: 2 },
+  dosingRow: { flexDirection: 'row', gap: 6 },
+  dosingLabel: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  dosingValue: { fontSize: 12, color: Colors.text },
+  dosingStatus: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginTop: 2,
+  },
+  dosingStatusWarn: { backgroundColor: '#FFF3E0' },
+  dosingStatusOk: { backgroundColor: Colors.verifiedLight },
+  dosingStatusText: { fontSize: 12, fontWeight: '700', flex: 1 },
 });
