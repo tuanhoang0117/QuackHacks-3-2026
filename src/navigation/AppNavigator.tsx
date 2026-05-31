@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import HomeScreen from '../screens/HomeScreen';
+import DocumentScreen from '../screens/DocumentScreen';
 import ScanScreen from '../screens/ScanScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -13,11 +14,12 @@ const Tab = createBottomTabNavigator();
 
 function tabIcon(route: string, focused: boolean): IconName {
   switch (route) {
-    case 'Home':    return focused ? 'home'         : 'home-outline';
-    case 'Scan':    return focused ? 'scan-circle'  : 'scan-circle-outline';
-    case 'History': return focused ? 'time'         : 'time-outline';
-    case 'Profile': return focused ? 'person'       : 'person-outline';
-    default:        return 'help-circle-outline';
+    case 'Home':      return focused ? 'home'                : 'home-outline';
+    case 'Documents': return focused ? 'document-text'      : 'document-text-outline';
+    case 'Scan':      return focused ? 'scan-circle'        : 'scan-circle-outline';
+    case 'History':   return focused ? 'time'               : 'time-outline';
+    case 'Profile':   return focused ? 'person'             : 'person-outline';
+    default:          return 'help-circle-outline';
   }
 }
 
@@ -47,12 +49,14 @@ export default function AppNavigator() {
         options={{ title: 'MedsCrossLink' }}
       />
       <Tab.Screen
+        name="Documents"
+        component={DocumentScreen}
+        options={{ title: 'Documents' }}
+      />
+      <Tab.Screen
         name="Scan"
         component={ScanScreen}
-        options={{
-          title: 'Scan',
-          tabBarLabelStyle: { fontWeight: '700' },
-        }}
+        options={{ title: 'Scan', tabBarLabelStyle: { fontWeight: '700' } }}
       />
       <Tab.Screen
         name="History"

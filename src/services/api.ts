@@ -5,7 +5,7 @@ import { MOCK_SCENARIOS } from '../mocks/mockScenarios';
 // Flip to false when Track B's FastAPI server is running at API_BASE_URL
 export const DEMO_MODE = true;
 
-const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = 'http://localhost:8000';
 
 export interface ScanPayload {
   imageUri: string;     // local URI from CameraView / ImageManipulator
@@ -44,6 +44,23 @@ export async function submitScan(
   }
 
   return response.json() as Promise<ReconciliationResult>;
+}
+
+// POST /log-dose  — informs the backend dose_log so /verify can catch too_soon on next scan
+export async function logDoseToBackend(
+  medicationName: string,
+  timestamp: string
+): Promise<void> {
+  if (DEMO_MODE) return;
+  try {
+    await fetch(`${API_BASE_URL}/log-dose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patient_id: 'PT-9942', medication_name: medicationName, timestamp }),
+    });
+  } catch {
+    // Non-fatal — local AsyncStorage log is the source of truth for the UI
+  }
 }
 
 // POST /speak  (CONTRACT.md: returns audio/mpeg binary stream)

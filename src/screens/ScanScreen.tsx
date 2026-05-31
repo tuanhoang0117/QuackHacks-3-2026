@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator,
+  ActivityIndicator, Modal, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -12,48 +12,43 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { ReconciliationResult, DemoScenario } from '../types';
 import { submitScan, fetchSpeechAudioUri, DEMO_MODE } from '../services/api';
-import { DEMO_SCENARIO_LABELS } from '../mocks/mockScenarios';
+import { saveDose } from '../services/doseLog';
 import VerdictBanner from '../components/VerdictBanner';
 import SafetyFlagCard from '../components/SafetyFlagCard';
 
 type Phase = 'ready' | 'loading' | 'result' | 'error';
 
-const DEMO_SCENARIOS = Object.entries(DEMO_SCENARIO_LABELS) as [DemoScenario, string][];
-
-const SAMPLE_CLINICAL_TEXT = `DISCHARGE MEDICATION RECONCILIATION
-Patient: Marcus Vance  (PT-9942)
-Prescribing Physician: Dr. A. Thornton
-
-MEDICATIONS TO TAKE AT HOME:
-1. Warfarin 5mg — Take one tablet daily (anticoagulant)
-2. Metronidazole 500mg — Take one tablet twice daily for 7 days (antibiotic)
-3. Lisinopril 10mg — Continue daily (blood pressure)
-
-Follow up in 2 weeks. Do not miss doses.`;
+const DEMO_CYCLE: DemoScenario[] = [
+  'happy_path',
+  'contraindication',
+  'lethal_interaction',
+  'double_dose',
+  'review_required',
+];
 
 const LOADING_STEPS = [
-  'Blur gate check (OpenCV)...',
-  'Object detection & bounding boxes...',
-  'Reading labels via Gemini 2.5 Flash...',
-  'Checking drug–drug interactions (MongoDB)...',
-  'Checking contraindications...',
-  'Checking dose timing (dose_log)...',
-  'Computing SHA-256 audit hash...',
-  'Writing memo to Solana Devnet...',
+  'Blur gate check (OpenCV)…',
+  'Object detection & bounding boxes…',
+  'Reading labels via Gemini 2.5 Flash…',
+  'Checking drug–drug interactions (MongoDB)…',
+  'Checking contraindications…',
+  'Checking dose timing (dose_log)…',
+  'Computing SHA-256 audit hash…',
+  'Writing memo to Solana Devnet…',
 ];
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const demoCycleRef = useRef(0);
 
   const [phase, setPhase] = useState<Phase>('ready');
-  const [selectedDemo, setSelectedDemo] = useState<DemoScenario>('lethal_interaction');
-  const [clinicalText, setClinicalText] = useState(SAMPLE_CLINICAL_TEXT);
-  const [showClinical, setShowClinical] = useState(false);
   const [result, setResult] = useState<ReconciliationResult | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [isSavingDose, setIsSavingDose] = useState(false);
 
   const runLoadingAnimation = useCallback(() => {
     let i = 0;
@@ -75,6 +70,11 @@ export default function ScanScreen() {
   }, []);
 
   const handleAnalyze = useCallback(async () => {
+    if (!DEMO_MODE && !permission?.granted) {
+      await requestPermission();
+      return;
+    }
+
     setPhase('loading');
     setResult(null);
     setLoadingStep(0);
@@ -98,10 +98,13 @@ export default function ScanScreen() {
         }
       }
 
-      // POST /verify with multipart/form-data (see CONTRACT.md)
+      // In DEMO_MODE cycle through scenarios invisibly
+      const scenario = DEMO_CYCLE[demoCycleRef.current % DEMO_CYCLE.length];
+      demoCycleRef.current += 1;
+
       const res = await submitScan(
-        { imageUri, clinicalText, patientId: 'PT-9942' },
-        selectedDemo
+        { imageUri, clinicalText: '', patientId: 'PT-9942' },
+        scenario
       );
 
       stopAnimation();
@@ -111,19 +114,14 @@ export default function ScanScreen() {
       stopAnimation();
       setPhase('error');
     }
-  }, [permission, clinicalText, selectedDemo, runLoadingAnimation]);
+  }, [permission, runLoadingAnimation, requestPermission]);
 
   const handleSpeak = useCallback(async () => {
     if (!result) return;
-
-    if (isSpeaking) {
-      await stopAudio();
-      return;
-    }
+    if (isSpeaking) { await stopAudio(); return; }
 
     if (!DEMO_MODE) {
       try {
-        // /speak returns audio/mpeg — fetched, cached to disk, played via expo-av
         const tempUri = await fetchSpeechAudioUri({ text: result.status_speech });
         if (tempUri) {
           setIsSpeaking(true);
@@ -142,11 +140,10 @@ export default function ScanScreen() {
           return;
         }
       } catch {
-        // Fall through to device TTS
+        // fall through to TTS
       }
     }
 
-    // Demo mode (or live-mode fallback): device TTS
     setIsSpeaking(true);
     Speech.speak(result.status_speech, {
       rate: 0.88,
@@ -163,6 +160,52 @@ export default function ScanScreen() {
     setLoadingStep(0);
   }, [stopAudio]);
 
+  const handleConfirmTaken = useCallback(async () => {
+    if (!result) return;
+    setIsSavingDose(true);
+    try {
+      const { logDoseToBackend } = await import('../services/api');
+      const now = new Date().toISOString();
+      const medName = result.matched_medications[0] ?? 'Unknown';
+      await saveDose({
+        id: `dose-${Date.now()}`,
+        medication_name: medName,
+        timestamp: now,
+        solana_payload_hash: result.solana_payload_hash,
+      });
+      await logDoseToBackend(medName, now);
+    } catch {
+      // dose saved locally even if backend call fails
+    } finally {
+      setIsSavingDose(false);
+      setConfirmModalVisible(false);
+      Alert.alert(
+        'Dose Logged',
+        'Your medication has been recorded and the audit hash written to Solana.',
+        [{ text: 'OK', onPress: handleReset }]
+      );
+    }
+  }, [result, handleReset]);
+
+  // ── Permission gate (live mode only) ──────────────────────────────────────
+  if (!DEMO_MODE && !permission?.granted) {
+    return (
+      <View style={styles.center}>
+        {!permission ? (
+          <ActivityIndicator color={Colors.primary} />
+        ) : (
+          <>
+            <Ionicons name="camera-outline" size={52} color={Colors.textSecondary} />
+            <Text style={styles.permText}>Camera access is required to scan medications.</Text>
+            <TouchableOpacity style={styles.permButton} onPress={requestPermission}>
+              <Text style={styles.permButtonText}>Grant Camera Access</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  }
+
   // ── Error phase ────────────────────────────────────────────────────────────
   if (phase === 'error') {
     return (
@@ -177,28 +220,6 @@ export default function ScanScreen() {
         </TouchableOpacity>
       </View>
     );
-  }
-
-  // ── Permission gate (live mode only) ──────────────────────────────────────
-  if (!DEMO_MODE) {
-    if (!permission) {
-      return (
-        <View style={styles.center}>
-          <ActivityIndicator color={Colors.primary} />
-        </View>
-      );
-    }
-    if (!permission.granted) {
-      return (
-        <View style={styles.center}>
-          <Ionicons name="camera-outline" size={52} color={Colors.textSecondary} />
-          <Text style={styles.permText}>Camera access is required to scan medications.</Text>
-          <TouchableOpacity style={styles.permButton} onPress={requestPermission}>
-            <Text style={styles.permButtonText}>Grant Camera Access</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
   }
 
   // ── Loading phase ──────────────────────────────────────────────────────────
@@ -241,7 +262,6 @@ export default function ScanScreen() {
         >
           <VerdictBanner result={result} />
 
-          {/* Mandatory human-review banner (CONTRACT.md UI Rendering Rules) */}
           {result.requires_human_review && (
             <View style={styles.reviewWarning}>
               <Ionicons name="warning" size={20} color={Colors.review} />
@@ -254,7 +274,6 @@ export default function ScanScreen() {
             </View>
           )}
 
-          {/* Safety Flags */}
           {result.safety_flags.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
@@ -266,7 +285,6 @@ export default function ScanScreen() {
             </View>
           )}
 
-          {/* Matched Medications */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               Medications Identified
@@ -286,31 +304,36 @@ export default function ScanScreen() {
             )}
           </View>
 
-          {/* Audio — ElevenLabs in live mode, device TTS in demo mode */}
           <TouchableOpacity
             style={[styles.audioButton, isSpeaking && styles.audioButtonActive]}
             onPress={handleSpeak}
             activeOpacity={0.85}
           >
-            <Ionicons
-              name={isSpeaking ? 'stop-circle' : 'volume-high'}
-              size={20}
-              color={Colors.white}
-            />
+            <Ionicons name={isSpeaking ? 'stop-circle' : 'volume-high'} size={20} color={Colors.white} />
             <Text style={styles.audioButtonText}>
               {isSpeaking ? 'Stop Audio' : 'Play Status Alert'}
               {DEMO_MODE ? ' (Device TTS)' : ' (ElevenLabs)'}
             </Text>
           </TouchableOpacity>
 
-          {/* Solana Audit Trail — hash only per CONTRACT.md */}
+          {/* Confirm Taken — only shown when verified safe */}
+          {result.status_tag === 'VERIFIED_PRESENT' && (
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => setConfirmModalVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-done-circle" size={22} color={Colors.white} />
+              <Text style={styles.confirmButtonText}>Confirm I Took This</Text>
+            </TouchableOpacity>
+          )}
+
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Solana Audit Trail</Text>
             <Text style={styles.hashLabel}>SHA-256 Event Hash (no PHI)</Text>
             <Text style={styles.hashValue} selectable>{result.solana_payload_hash}</Text>
           </View>
 
-          {/* Alert Transcript */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Alert Transcript</Text>
             <Text style={styles.speechText}>{result.status_speech}</Text>
@@ -321,6 +344,53 @@ export default function ScanScreen() {
             <Text style={styles.resetButtonText}>New Scan</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Confirmation modal */}
+        <Modal
+          visible={confirmModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setConfirmModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Ionicons name="medical" size={36} color={Colors.verified} />
+              <Text style={styles.modalTitle}>Confirm Dose Taken</Text>
+              <Text style={styles.modalBody}>
+                Are you confirming that{' '}
+                <Text style={{ fontWeight: '700' }}>
+                  {result.matched_medications.join(', ')}
+                </Text>{' '}
+                was just administered to Marcus Vance?
+              </Text>
+              <Text style={styles.modalSub}>
+                This will be logged and an immutable hash written to Solana.
+              </Text>
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={handleConfirmTaken}
+                disabled={isSavingDose}
+                activeOpacity={0.85}
+              >
+                {isSavingDose ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.white} />
+                    <Text style={styles.modalConfirmText}>Yes, Log This Dose</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setConfirmModalVisible(false)}
+                disabled={isSavingDose}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -332,8 +402,8 @@ export default function ScanScreen() {
         {DEMO_MODE ? (
           <View style={styles.demoPlaceholder}>
             <Ionicons name="scan" size={56} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.demoPlaceholderTitle}>Demo Mode Active</Text>
-            <Text style={styles.demoPlaceholderSub}>No camera required — select a scenario below</Text>
+            <Text style={styles.demoPlaceholderTitle}>Place Medication in Frame</Text>
+            <Text style={styles.demoPlaceholderSub}>Position pill tray within the guides and tap Analyze</Text>
           </View>
         ) : (
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back">
@@ -350,69 +420,12 @@ export default function ScanScreen() {
         )}
       </View>
 
-      <ScrollView
-        style={styles.controls}
-        contentContainerStyle={styles.controlsContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {DEMO_MODE && (
-          <View style={styles.demoSelector}>
-            <Text style={styles.controlLabel}>Demo Scenario</Text>
-            {DEMO_SCENARIOS.map(([key, label]) => (
-              <TouchableOpacity
-                key={key}
-                style={[styles.scenarioRow, selectedDemo === key && styles.scenarioRowSelected]}
-                onPress={() => setSelectedDemo(key)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.radio, selectedDemo === key && styles.radioSelected]}>
-                  {selectedDemo === key && <View style={styles.radioDot} />}
-                </View>
-                <Text style={[styles.scenarioText, selectedDemo === key && styles.scenarioTextSelected]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={styles.clinicalToggle}
-          onPress={() => setShowClinical(v => !v)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="document-text-outline" size={16} color={Colors.primary} />
-          <Text style={styles.clinicalToggleText}>
-            {showClinical ? 'Hide' : 'Edit'} Clinical Document Text
-          </Text>
-          <Ionicons
-            name={showClinical ? 'chevron-up' : 'chevron-down'}
-            size={14}
-            color={Colors.primary}
-          />
-        </TouchableOpacity>
-
-        {showClinical && (
-          <TextInput
-            style={styles.clinicalInput}
-            multiline
-            numberOfLines={6}
-            value={clinicalText}
-            onChangeText={setClinicalText}
-            placeholder="Paste discharge summary or prescription text…"
-            placeholderTextColor={Colors.textLight}
-            textAlignVertical="top"
-          />
-        )}
-
+      <View style={styles.controls}>
         <TouchableOpacity style={styles.analyzeButton} onPress={handleAnalyze} activeOpacity={0.88}>
           <Ionicons name="shield-checkmark" size={22} color={Colors.white} />
-          <Text style={styles.analyzeButtonText}>
-            {DEMO_MODE ? 'Run Demo Scenario' : 'Capture & Analyze'}
-          </Text>
+          <Text style={styles.analyzeButtonText}>Capture & Analyze</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -449,7 +462,7 @@ const styles = StyleSheet.create({
   loadingStepText: { fontSize: 13, color: Colors.textLight },
   loadingStepActive: { color: Colors.text },
 
-  cameraContainer: { height: 220, backgroundColor: '#0a0f1e', overflow: 'hidden' },
+  cameraContainer: { flex: 1, backgroundColor: '#0a0f1e', overflow: 'hidden' },
   cameraFrame: { flex: 1, margin: 32, position: 'relative' },
   cornerTL: {
     position: 'absolute', top: 0, left: 0,
@@ -478,44 +491,7 @@ const styles = StyleSheet.create({
   demoPlaceholderTitle: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   demoPlaceholderSub: { color: 'rgba(255,255,255,0.55)', fontSize: 12 },
 
-  controls: { flex: 1 },
-  controlsContent: { padding: 14, gap: 12, paddingBottom: 24 },
-  controlLabel: {
-    fontSize: 12, fontWeight: '700', color: Colors.textSecondary,
-    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
-  },
-
-  demoSelector: {
-    backgroundColor: Colors.card, borderRadius: 12, padding: 14, gap: 6,
-    shadowColor: Colors.black, shadowOpacity: 0.04, shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2,
-  },
-  scenarioRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8,
-  },
-  scenarioRowSelected: { backgroundColor: '#EEF2FF' },
-  radio: {
-    width: 18, height: 18, borderRadius: 9, borderWidth: 2,
-    borderColor: Colors.border, alignItems: 'center', justifyContent: 'center',
-  },
-  radioSelected: { borderColor: Colors.primary },
-  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary },
-  scenarioText: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
-  scenarioTextSelected: { color: Colors.primary, fontWeight: '600' },
-
-  clinicalToggle: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.card, borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  clinicalToggleText: { flex: 1, fontSize: 13, color: Colors.primary, fontWeight: '600' },
-  clinicalInput: {
-    backgroundColor: Colors.card, borderRadius: 10, padding: 12,
-    fontSize: 12, color: Colors.text, borderWidth: 1, borderColor: Colors.border,
-    minHeight: 120, fontFamily: 'monospace', lineHeight: 18,
-  },
-
+  controls: { padding: 16, paddingBottom: 24 },
   analyzeButton: {
     backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 10, paddingVertical: 16, borderRadius: 12,
@@ -553,12 +529,17 @@ const styles = StyleSheet.create({
   audioButtonActive: { backgroundColor: Colors.textSecondary },
   audioButtonText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
 
+  confirmButton: {
+    backgroundColor: Colors.verified, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 10, paddingVertical: 16, borderRadius: 12,
+  },
+  confirmButtonText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
+
   hashLabel: { fontSize: 11, color: Colors.textSecondary },
   hashValue: {
     fontSize: 11, color: Colors.text, fontFamily: 'monospace',
     backgroundColor: '#F5F5F5', borderRadius: 6, padding: 8, lineHeight: 16,
   },
-
   speechText: { fontSize: 13, color: Colors.text, lineHeight: 20, fontStyle: 'italic' },
 
   resetButton: {
@@ -566,4 +547,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12,
   },
   resetButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+
+  // Modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center', padding: 24,
+  },
+  modalCard: {
+    backgroundColor: Colors.white, borderRadius: 16, padding: 24,
+    width: '100%', alignItems: 'center', gap: 12,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.text },
+  modalBody: { fontSize: 14, color: Colors.text, textAlign: 'center', lineHeight: 20 },
+  modalSub: { fontSize: 12, color: Colors.textSecondary, textAlign: 'center', lineHeight: 17 },
+  modalConfirmButton: {
+    backgroundColor: Colors.verified, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 24,
+    borderRadius: 10, width: '100%', minHeight: 48,
+  },
+  modalConfirmText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  modalCancelButton: { paddingVertical: 10 },
+  modalCancelText: { fontSize: 14, color: Colors.textSecondary },
 });

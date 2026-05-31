@@ -43,3 +43,19 @@ export type DemoScenario =
   | 'lethal_interaction'
   | 'double_dose'
   | 'review_required';
+
+export interface DoseLogEntry {
+  id: string;
+  medication_name: string;
+  timestamp: string;
+  solana_payload_hash: string;
+}
+
+export interface DocumentAskResponse {
+  answer: string;
+  relevant_excerpt: string;
+}
+
+export interface DocumentSummaryResponse {
+  summary: string;
+}
