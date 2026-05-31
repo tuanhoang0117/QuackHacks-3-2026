@@ -10,7 +10,7 @@
 
 Every year, **20% of discharged patients suffer complications within 30 days** of leaving the hospital, and **66% of those complications are caused by medication errors** (New England Journal of Medicine).
 
-Patients go home alone with discharge paperwork listing multiple new medications, often prescribed by different providers who are not in contact with each other. A cardiologist prescribes a blood thinner. A dentist, unaware, prescribes an antibiotic. The patient, not a medical professional, has no way of knowing those two drugs together can cause fatal internal hemorrhage.
+Patients go home alone with discharge paperwork listing multiple new medictions, often prescribed by different providers who are not in contact with each other. A cardiologist prescribes a blood thinner. A dentist, unaware, prescribes an antibiotic. The patient, not a medical professional, has no way of knowing those two drugs together can cause fatal internal hemorrhage.
 
 Consumer health apps offer reminders and logs. **None of them physically verify what is in the patient's hand**, cross-reference it against their full medical history, and stop them before they take something dangerous.
 
@@ -65,7 +65,22 @@ Result: BLOCKED (Critical) — Metronidazole inhibits the CYP2C9 enzyme, blockin
 Marcus scans his Warfarin again 47 minutes after already taking a dose.
 Result: BLOCKED — A dose was already logged. Minimum re-dose interval is 8 hours.
 
----
+## Screenshots
+
+> Add screenshots of the app here to showcase the UI and demo flows.
+>
+> <!-- To add a screenshot: upload your image to the `screenshots/` folder and reference it below -->
+>
+> | Screen | Description |
+> |--------|-------------|
+> | ![Scan Screen](screenshots/scan-screen.png) | Camera scan view — patient points phone at pill tray |
+> | ![Safety Alert](screenshots/safety-alert.png) | Red BLOCKED alert with spoken explanation |
+> | ![Clear Result](screenshots/clear-result.png) | Green CLEAR confirmation after passing all checks |
+> | ![Q&A Chat](screenshots/qa-chat.png) | Patient Q&A interface for asking medication questions |
+>
+> > **Note:** Replace the placeholder paths above with actual screenshot files. Upload images to a `screenshots/` folder in the repo root and update the paths accordingly.
+> >
+> > ---
 
 ## How It Works
 
