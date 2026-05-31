@@ -1,0 +1,14 @@
+[
+  {
+    "drug_a": "Metronidazole",
+    "drug_b": "Warfarin",
+    "severity": "Critical",
+    "mechanism": "Metronidazole inhibits the CYP2C9 enzyme, blocking Warfarin metabolism. This causes toxic accumulation of the blood thinner and a severe risk of fatal internal hemorrhage."
+  },
+  {
+    "drug_a": "Ibuprofen",
+    "drug_b": "Lisinopril",
+    "severity": "Moderate",
+    "mechanism": "NSAIDs such as Ibuprofen reduce the antihypertensive effect of Lisinopril and raise the risk of renal impairment."
+  }
+]

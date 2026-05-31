@@ -1,0 +1,37 @@
+[
+  {
+    "drug_name": "Warfarin",
+    "max_single_dose_mg": 10,
+    "max_daily_dose_mg": 10,
+    "min_interval_minutes": 480,
+    "standard_form": "tablet"
+  },
+  {
+    "drug_name": "Lisinopril",
+    "max_single_dose_mg": 40,
+    "max_daily_dose_mg": 80,
+    "min_interval_minutes": 720,
+    "standard_form": "tablet"
+  },
+  {
+    "drug_name": "Metronidazole",
+    "max_single_dose_mg": 500,
+    "max_daily_dose_mg": 2000,
+    "min_interval_minutes": 480,
+    "standard_form": "tablet"
+  },
+  {
+    "drug_name": "Pseudoephedrine",
+    "max_single_dose_mg": 60,
+    "max_daily_dose_mg": 240,
+    "min_interval_minutes": 240,
+    "standard_form": "tablet"
+  },
+  {
+    "drug_name": "Ibuprofen",
+    "max_single_dose_mg": 800,
+    "max_daily_dose_mg": 3200,
+    "min_interval_minutes": 360,
+    "standard_form": "tablet"
+  }
+]

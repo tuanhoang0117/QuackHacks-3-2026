@@ -1,0 +1,8 @@
+[
+  {
+    "drug_name": "Pseudoephedrine",
+    "contraindicated_condition": "Severe Essential Hypertension (High Blood Pressure)",
+    "severity": "High",
+    "mechanism": "Pseudoephedrine is a systemic vasoconstrictor. In severe hypertension it can trigger a hypertensive crisis, risking stroke or myocardial infarction."
+  }
+]

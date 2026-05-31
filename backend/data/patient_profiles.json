@@ -1,0 +1,18 @@
+[
+  {
+    "patient_id": "PT-9942",
+    "name": "Marcus Vance",
+    "dob": "1968-11-14",
+    "biological_sex": "Male",
+    "occupation": "High School Athletics Director",
+    "emergency_contact": "Sarah Vance (Spouse) - 555-0192",
+    "chief_complaint": "Leg pain and swelling; subsequent dental pain.",
+    "past_medical_history": [
+      "Severe Essential Hypertension (High Blood Pressure)",
+      "Hyperlipidemia (High Cholesterol)"
+    ],
+    "past_surgical_history": ["None"],
+    "allergies": [{ "substance": "Latex", "reaction": "Contact Dermatitis" }],
+    "active_prescriptions_pre_admission": ["Lisinopril 10mg daily"]
+  }
+]

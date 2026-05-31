@@ -1,0 +1,114 @@
+================================================================================
+                     RIVERSIDE GENERAL HOSPITAL
+                       PATIENT DISCHARGE SUMMARY
+================================================================================
+
+PATIENT INFORMATION
+-------------------
+Name:               Marcus Vance
+Date of Birth:      November 14, 1968
+Patient ID:         PT-9942
+Sex:                Male
+Occupation:         High School Athletics Director
+
+Admitting Provider: Dr. Angela Rhee, MD — Internal Medicine
+Discharging Provider: Dr. Angela Rhee, MD
+Admission Date:     March 10, 2024
+Discharge Date:     March 15, 2024
+
+Emergency Contact:  Sarah Vance (Spouse) — 555-0192
+
+================================================================================
+REASON FOR ADMISSION
+================================================================================
+
+Mr. Vance presented to the Emergency Department on March 10, 2024 with a
+3-day history of progressive left leg pain, swelling, and warmth. He reported
+difficulty walking and mild shortness of breath on exertion.
+
+DIAGNOSIS AT DISCHARGE:
+  Primary:   Deep Vein Thrombosis (DVT), Left Lower Extremity
+  Secondary: Severe Essential Hypertension (ongoing, pre-existing)
+             Hyperlipidemia (ongoing, pre-existing)
+
+================================================================================
+HOSPITAL COURSE
+================================================================================
+
+Mr. Vance underwent Doppler ultrasound on admission, which confirmed an
+occlusive thrombus in the left popliteal vein. He was started on IV heparin
+and transitioned to oral Warfarin therapy for long-term anticoagulation.
+Blood pressure was monitored closely throughout admission and remained
+controlled on his existing Lisinopril regimen.
+
+His shortness of breath resolved by day 2 and CT pulmonary angiography was
+negative for pulmonary embolism. He was ambulatory with compression stockings
+by day 4 and cleared for discharge on day 5.
+
+================================================================================
+DISCHARGE MEDICATIONS
+================================================================================
+
+CONTINUE the following medications:
+
+1. WARFARIN (Coumadin) — 5 mg tablet
+   - Take ONE tablet by mouth ONCE DAILY at the same time every evening.
+   - Do NOT skip doses. If you miss a dose, take it as soon as you remember
+     the same day. Do not double up the next day.
+   - Avoid significant changes in your intake of Vitamin K-rich foods
+     (leafy greens, broccoli) as this affects Warfarin levels.
+   - Do NOT take aspirin, ibuprofen, or naproxen without first speaking
+     to your provider. These medications increase bleeding risk.
+   - Watch for unusual bruising, prolonged bleeding from cuts, blood in
+     urine or stool, or severe headache — go to the ER immediately.
+
+2. LISINOPRIL — 10 mg tablet
+   - Take ONE tablet by mouth ONCE DAILY every morning.
+   - Continue as previously prescribed for blood pressure management.
+   - Stay well hydrated. Avoid excessive potassium supplements.
+
+================================================================================
+FOLLOW-UP INSTRUCTIONS
+================================================================================
+
+URGENT — INR BLOOD WORK:
+  You MUST have your INR (blood clotting level) checked within 5 days
+  of discharge. Contact Riverside General Lab: 555-0140.
+  Target INR range: 2.0 – 3.0
+
+APPOINTMENTS:
+  - Cardiology / Anticoagulation Clinic: Within 1 week
+    Dr. Samuel Park — 555-0177
+  - Primary Care follow-up: Within 2 weeks
+    Dr. Angela Rhee — 555-0133
+
+ACTIVITY:
+  - Light walking is encouraged to prevent further clotting.
+  - NO strenuous exercise, heavy lifting, or contact sports for 4 weeks.
+  - Wear your compression stockings on the left leg daily.
+
+DIET:
+  - Maintain a CONSISTENT intake of Vitamin K. Do not suddenly increase
+    or decrease leafy green vegetable consumption.
+  - Limit alcohol — alcohol interacts with Warfarin and increases
+    bleeding risk.
+
+WHEN TO SEEK EMERGENCY CARE:
+  Go to the nearest ER immediately if you experience:
+  - Sudden chest pain or difficulty breathing
+  - Coughing up blood
+  - Severe or sudden headache
+  - Vision changes or sudden weakness/numbness
+  - Significant bleeding that does not stop
+
+================================================================================
+ALLERGIES ON FILE:   Latex — Contact Dermatitis
+================================================================================
+
+Discharging Physician Signature: ____________________________
+Dr. Angela Rhee, MD — Internal Medicine
+Riverside General Hospital
+License No.: CA-293847
+
+Date: March 15, 2024
+================================================================================

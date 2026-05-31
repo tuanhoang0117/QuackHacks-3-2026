@@ -1,0 +1,19 @@
+{
+  "name": "medscrosslink-solana",
+  "version": "1.0.0",
+  "scripts": {
+    "log": "ts-node solana_logger.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.3",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "@types/node-fetch": "^2.6.13",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}
