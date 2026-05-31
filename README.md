@@ -74,6 +74,14 @@ Result: BLOCKED — A dose was already logged. Minimum re-dose interval is 8 hou
 > > Blocked — Critical drug-drug interaction: Metronidazole + Warfarin. Severe risk of fatal internal hemorrhage.
 > >
 > > <img src="screenshot-blocked-metronidazole-warfarin.png" width="300" alt="Blocked — Metronidazole + Warfarin critical interaction">
+> 
+> Home Dashboard — Patient profile with active conditions and quick actions.
+> 
+> <img src="screenshots/home-dashboard.png" width="300" alt="Home Dashboard — oculusMD patient profile">
+> 
+> Scan Screen — Camera view for scanning medication bottle labels.
+> 
+> <img src="screenshots/scan-screen.png" width="300" alt="Scan Screen — Lisinopril bottle label scan">
 
 ## How It Works
 
