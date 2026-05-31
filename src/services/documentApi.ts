@@ -118,30 +118,29 @@ export async function getDocumentSummary(
     return { summary, stop: () => { Speech.stop(); onDone(); } };
   }
 
-  const body = JSON.stringify({ clinical_text: payload.clinicalText });
+  // Step 1: Get summary text from Gemini only (no ElevenLabs, no timeout risk)
+  const textRes = await fetch(`${API_BASE_URL}/summarize/text`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clinical_text: payload.clinicalText }),
+  });
+  if (!textRes.ok) {
+    const msg = await textRes.text().catch(() => '');
+    throw new Error(`/summarize/text ${textRes.status}: ${msg}`);
+  }
+  const { summary } = await textRes.json() as { summary: string };
 
-  // Try ElevenLabs audio first; fall back to text-only + expo-speech
+  // Step 2: Speak via /speak — same endpoint scan screen uses, proven reliable
   try {
-    const response = await fetch(`${API_BASE_URL}/summarize`, {
+    const speakRes = await fetch(`${API_BASE_URL}/speak`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body,
+      body: JSON.stringify({ text: summary }),
     });
-    if (!response.ok) throw new Error(`/summarize ${response.status}`);
-    const summary = response.headers.get('X-Summary-Text') ?? payload.clinicalText;
-    const stop = await playAudioBlob(await response.blob(), onDone);
+    if (!speakRes.ok) throw new Error(`/speak ${speakRes.status}`);
+    const stop = await playAudioBlob(await speakRes.blob(), onDone);
     return { summary, stop };
   } catch {
-    const textRes = await fetch(`${API_BASE_URL}/summarize/text`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
-    if (!textRes.ok) {
-      const msg = await textRes.text().catch(() => '');
-      throw new Error(`/summarize/text ${textRes.status}: ${msg}`);
-    }
-    const { summary } = await textRes.json() as { summary: string };
     Speech.speak(summary, { rate: 0.88, onDone, onError: onDone, onStopped: onDone });
     return { summary, stop: () => { Speech.stop(); onDone(); } };
   }
