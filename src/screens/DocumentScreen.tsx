@@ -50,12 +50,10 @@ export default function DocumentScreen() {
     setProcessingStep(0);
     setProcessingTotal(pagesToProcess.length);
     try {
-      const texts: string[] = [];
-      for (let i = 0; i < pagesToProcess.length; i++) {
-        setProcessingStep(i);
-        const text = await uploadDocumentForText(pagesToProcess[i].uri, pagesToProcess[i].mimeType);
-        texts.push(text);
-      }
+      // Fire all OCR requests in parallel — avoids sequential 60s+ timeout
+      const texts = await Promise.all(
+        pagesToProcess.map(page => uploadDocumentForText(page.uri, page.mimeType))
+      );
       setClinicalText(texts.join('\n\n---\n\n'));
       setProcessingStep(pagesToProcess.length);
       setPhase('ready');
@@ -80,8 +78,8 @@ export default function DocumentScreen() {
       if (!photo?.uri) return;
       const resized = await ImageManipulator.manipulateAsync(
         photo.uri,
-        [{ resize: { width: 1024 } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        [{ resize: { width: 800 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
       );
       setPages(prev => [...prev, { uri: resized.uri, mimeType: 'image/jpeg' }]);
       setShowCamera(false);
