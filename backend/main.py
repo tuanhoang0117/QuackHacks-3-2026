@@ -61,7 +61,10 @@ class LogDoseRequest(BaseModel):
 async def _speak_audio(text: str):
     """Calls ElevenLabs and streams back audio bytes."""
     if not ELEVENLABS_API_KEY:
-        raise HTTPException(status_code=503, detail="ElevenLabs API key not configured.")
+        raise HTTPException(
+            status_code=503,
+            detail="ElevenLabs API key not configured. Set ELEVENLABS_API_KEY in .env."
+        )
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
     headers = {
@@ -74,10 +77,13 @@ async def _speak_audio(text: str):
         "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
     }
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(url, headers=headers, json=payload)
         if response.status_code != 200:
-            raise HTTPException(status_code=502, detail="ElevenLabs request failed.")
+            raise HTTPException(
+                status_code=502,
+                detail=f"ElevenLabs {response.status_code}: {response.text[:300]}"
+            )
         return response.content
 
 
