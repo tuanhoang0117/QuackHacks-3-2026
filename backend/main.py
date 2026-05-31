@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import datetime
 import asyncio
@@ -60,8 +61,17 @@ class LogDoseRequest(BaseModel):
 
 # ---------- Helpers ----------
 
+def _sanitize_for_tts(text: str) -> str:
+    text = re.sub(r'\*+', '', text)
+    text = re.sub(r'#+\s?', '', text)
+    text = re.sub(r'\n+', ' ', text)
+    text = re.sub(r'\s{2,}', ' ', text)
+    return text.strip()
+
+
 async def _speak_audio(text: str):
     """Calls ElevenLabs and streams back audio bytes."""
+    text = _sanitize_for_tts(text)
     if not ELEVENLABS_API_KEY:
         raise HTTPException(
             status_code=503,
