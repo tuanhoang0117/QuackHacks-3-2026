@@ -12,18 +12,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { DocumentAskResponse } from '../types';
 import { askDocumentQuestion, getDocumentSummary, uploadDocumentForText } from '../services/documentApi';
-import { DEMO_MODE } from '../services/api';
 
 type Phase = 'capture' | 'processing' | 'ready' | 'error';
 
-const PROCESSING_STEPS = [
-  'Uploading document…',
-  'Extracting text (Gemini)…',
-  'Building semantic index…',
-  'Ready for questions',
-];
-
-const DEMO_IMAGE_URI = '';
+interface DocumentPage {
+  uri: string;
+  mimeType: string;
+}
 
 export default function DocumentScreen() {
   const [camPermission, requestCamPermission] = useCameraPermissions();
@@ -31,25 +26,16 @@ export default function DocumentScreen() {
 
   const [phase, setPhase] = useState<Phase>('capture');
   const [showCamera, setShowCamera] = useState(false);
-  const [docImageUri, setDocImageUri] = useState<string>('');
-  const [docMimeType, setDocMimeType] = useState<string>('image/jpeg');
+  const [pages, setPages] = useState<DocumentPage[]>([]);
   const [clinicalText, setClinicalText] = useState<string>('');
+  const [summaryText, setSummaryText] = useState<string>('');
   const [processingStep, setProcessingStep] = useState(0);
+  const [processingTotal, setProcessingTotal] = useState(0);
   const [question, setQuestion] = useState('');
   const [qaHistory, setQaHistory] = useState<{ q: string; a: DocumentAskResponse }[]>([]);
   const [isAsking, setIsAsking] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const stopAudioRef = useRef<(() => void) | null>(null);
-
-  const runProcessingAnimation = useCallback(() => {
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      setProcessingStep(i);
-      if (i >= PROCESSING_STEPS.length - 1) clearInterval(id);
-    }, 500);
-    return () => clearInterval(id);
-  }, []);
 
   const stopAudio = useCallback(() => {
     if (stopAudioRef.current) {
@@ -59,25 +45,27 @@ export default function DocumentScreen() {
     setIsSpeaking(false);
   }, []);
 
-  const processDocument = useCallback(async (uri: string, mimeType: string = 'image/jpeg') => {
-    setDocImageUri(uri);
-    setDocMimeType(mimeType);
-    setShowCamera(false);
+  const processAllPages = useCallback(async (pagesToProcess: DocumentPage[]) => {
     setPhase('processing');
     setProcessingStep(0);
-    const stopAnim = runProcessingAnimation();
-
+    setProcessingTotal(pagesToProcess.length);
     try {
-      const text = await uploadDocumentForText(uri, mimeType);
-      stopAnim();
-      setProcessingStep(PROCESSING_STEPS.length - 1);
-      setClinicalText(text);
+      const texts: string[] = [];
+      const summaries: string[] = [];
+      for (let i = 0; i < pagesToProcess.length; i++) {
+        setProcessingStep(i);
+        const { clinicalText, summary } = await uploadDocumentForText(pagesToProcess[i].uri, pagesToProcess[i].mimeType);
+        texts.push(clinicalText);
+        summaries.push(summary);
+      }
+      setClinicalText(texts.join('\n\n---\n\n'));
+      setSummaryText(summaries.join('\n\n'));
+      setProcessingStep(pagesToProcess.length);
       setPhase('ready');
     } catch {
-      stopAnim();
       setPhase('error');
     }
-  }, [runProcessingAnimation]);
+  }, []);
 
   const handleScanDocument = useCallback(async () => {
     if (!camPermission?.granted) {
@@ -97,20 +85,22 @@ export default function DocumentScreen() {
         [{ resize: { width: 1024 } }],
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
       );
-      await processDocument(resized.uri);
+      setPages(prev => [...prev, { uri: resized.uri, mimeType: 'image/jpeg' }]);
+      setShowCamera(false);
     } catch {
       setPhase('error');
     }
-  }, [processDocument]);
+  }, []);
 
   const handleUpload = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
       quality: 0.8,
     });
-    if (result.canceled || !result.assets[0]?.uri) return;
-    await processDocument(result.assets[0].uri, 'image/jpeg');
-  }, [processDocument]);
+    if (result.canceled) return;
+    setPages(prev => [...prev, ...result.assets.map(a => ({ uri: a.uri, mimeType: 'image/jpeg' }))]);
+  }, []);
 
   const handlePickFile = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -119,8 +109,16 @@ export default function DocumentScreen() {
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    await processDocument(asset.uri, asset.mimeType ?? 'application/pdf');
-  }, [processDocument]);
+    setPages(prev => [...prev, { uri: asset.uri, mimeType: asset.mimeType ?? 'application/pdf' }]);
+  }, []);
+
+  const handleRemovePage = useCallback((index: number) => {
+    setPages(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    processAllPages(pages);
+  }, [pages, processAllPages]);
 
   const handleAsk = useCallback(async () => {
     if (!question.trim() || isAsking) return;
@@ -137,7 +135,6 @@ export default function DocumentScreen() {
       setIsSpeaking(true);
       stopAudioRef.current = stop;
     } catch {
-      // show error inline
       setQaHistory(prev => [{
         q,
         a: { answer: 'Could not get an answer. Please try again.', relevant_excerpt: '' },
@@ -152,24 +149,25 @@ export default function DocumentScreen() {
     setIsSpeaking(true);
     try {
       const { stop } = await getDocumentSummary(
-        { clinicalText },
+        { clinicalText: summaryText },
         () => setIsSpeaking(false)
       );
       stopAudioRef.current = stop;
     } catch {
       setIsSpeaking(false);
     }
-  }, [isSpeaking, clinicalText, stopAudio]);
+  }, [isSpeaking, summaryText, stopAudio]);
 
   const handleReset = useCallback(() => {
     stopAudio();
     setPhase('capture');
-    setDocImageUri('');
-    setDocMimeType('image/jpeg');
+    setPages([]);
     setClinicalText('');
+    setSummaryText('');
     setQaHistory([]);
     setQuestion('');
     setProcessingStep(0);
+    setProcessingTotal(0);
   }, [stopAudio]);
 
   // ── Camera overlay ─────────────────────────────────────────────────────────
@@ -198,25 +196,12 @@ export default function DocumentScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.processingTitle}>Reading Document</Text>
-        <View style={styles.stepsContainer}>
-          {PROCESSING_STEPS.map((step, i) => (
-            <View key={i} style={styles.stepRow}>
-              {i <= processingStep ? (
-                <Ionicons
-                  name={i < processingStep ? 'checkmark-circle' : 'ellipse'}
-                  size={14}
-                  color={i < processingStep ? Colors.verified : Colors.primary}
-                />
-              ) : (
-                <Ionicons name="ellipse-outline" size={14} color={Colors.textLight} />
-              )}
-              <Text style={[styles.stepText, i <= processingStep && styles.stepTextActive]}>
-                {step}
-              </Text>
-            </View>
-          ))}
-        </View>
+        <Text style={styles.processingTitle}>Reading Documents</Text>
+        <Text style={styles.processingStep}>
+          {processingStep < processingTotal
+            ? `Processing page ${processingStep + 1} of ${processingTotal}…`
+            : 'Done'}
+        </Text>
       </View>
     );
   }
@@ -240,37 +225,82 @@ export default function DocumentScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.captureContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="document-text" size={64} color={Colors.primary} />
-          </View>
-          <Text style={styles.captureTitle}>Scan a Discharge Summary</Text>
-          <Text style={styles.captureSubtitle}>
-            Capture or upload a discharge document to ask questions and hear a full summary read aloud.
-          </Text>
 
+          {pages.length === 0 && (
+            <>
+              <View style={styles.heroIcon}>
+                <Ionicons name="document-text" size={64} color={Colors.primary} />
+              </View>
+              <Text style={styles.captureTitle}>Scan a Discharge Summary</Text>
+              <Text style={styles.captureSubtitle}>
+                Capture or upload one or more pages, then tap Submit.
+              </Text>
+            </>
+          )}
+
+          {/* Thumbnail strip */}
+          {pages.length > 0 && (
+            <View style={styles.stripContainer}>
+              <Text style={styles.stripLabel}>
+                {pages.length} page{pages.length !== 1 ? 's' : ''} added
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.stripScroll}
+              >
+                {pages.map((page, index) => (
+                  <View key={index} style={styles.thumbCell}>
+                    {page.mimeType === 'application/pdf' ? (
+                      <View style={styles.thumbPdf}>
+                        <Ionicons name="document" size={28} color={Colors.primary} />
+                        <Text style={styles.thumbPdfLabel}>PDF</Text>
+                      </View>
+                    ) : (
+                      <Image source={{ uri: page.uri }} style={styles.thumbImage} resizeMode="cover" />
+                    )}
+                    <TouchableOpacity
+                      style={styles.thumbRemove}
+                      onPress={() => handleRemovePage(index)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Ionicons name="close-circle" size={22} color="#E53935" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Source buttons */}
           <TouchableOpacity style={styles.primaryButton} onPress={handleScanDocument} activeOpacity={0.85}>
             <Ionicons name="camera" size={20} color={Colors.white} />
-            <Text style={styles.primaryButtonText}>Scan Document</Text>
+            <Text style={styles.primaryButtonText}>
+              {pages.length > 0 ? 'Add Another Page (Camera)' : 'Scan with Camera'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={handleUpload} activeOpacity={0.85}>
             <Ionicons name="image-outline" size={20} color={Colors.primary} />
-            <Text style={styles.secondaryButtonText}>Upload from Photo Library</Text>
+            <Text style={styles.secondaryButtonText}>
+              {pages.length > 0 ? 'Add from Photo Library' : 'Upload from Photo Library'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={handlePickFile} activeOpacity={0.85}>
             <Ionicons name="document-outline" size={20} color={Colors.primary} />
-            <Text style={styles.secondaryButtonText}>Upload PDF from Files</Text>
+            <Text style={styles.secondaryButtonText}>
+              {pages.length > 0 ? 'Add PDF from Files' : 'Upload PDF from Files'}
+            </Text>
           </TouchableOpacity>
 
-          {DEMO_MODE && (
-            <TouchableOpacity
-              style={styles.demoSkipButton}
-              onPress={() => processDocument(DEMO_IMAGE_URI)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="flask-outline" size={16} color="#7B1FA2" />
-              <Text style={styles.demoSkipText}>Demo: Use Sample Discharge Summary</Text>
+          {/* Submit button — only shown once pages exist */}
+          {pages.length > 0 && (
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} activeOpacity={0.85}>
+              <Ionicons name="arrow-forward-circle" size={20} color={Colors.white} />
+              <Text style={styles.submitButtonText}>
+                Submit {pages.length} Page{pages.length !== 1 ? 's' : ''}
+              </Text>
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -292,21 +322,13 @@ export default function DocumentScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Document preview */}
-          {docImageUri && docMimeType !== 'application/pdf' ? (
-            <Image source={{ uri: docImageUri }} style={styles.docThumb} resizeMode="cover" />
-          ) : (
-            <View style={styles.docThumbPlaceholder}>
-              <Ionicons
-                name={docMimeType === 'application/pdf' ? 'document' : 'document-text'}
-                size={40}
-                color={Colors.primary}
-              />
-              <Text style={styles.docThumbPlaceholderText}>
-                {docMimeType === 'application/pdf' ? 'PDF Document Loaded' : 'Document Ready'}
-              </Text>
-            </View>
-          )}
+          {/* Page count card */}
+          <View style={styles.docThumbPlaceholder}>
+            <Ionicons name="documents" size={40} color={Colors.primary} />
+            <Text style={styles.docThumbPlaceholderText}>
+              {pages.length} page{pages.length !== 1 ? 's' : ''} processed
+            </Text>
+          </View>
 
           {/* Summary button */}
           <TouchableOpacity
@@ -395,10 +417,7 @@ const styles = StyleSheet.create({
 
   // Processing
   processingTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginTop: 8 },
-  stepsContainer: { width: '100%', gap: 8, marginTop: 8 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepText: { fontSize: 13, color: Colors.textLight },
-  stepTextActive: { color: Colors.text },
+  processingStep: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
 
   // Error
   errorTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, textAlign: 'center' },
@@ -415,6 +434,20 @@ const styles = StyleSheet.create({
     fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 8,
   },
 
+  // Thumbnail strip
+  stripContainer: { width: '100%', gap: 8 },
+  stripLabel: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary },
+  stripScroll: { gap: 10, paddingVertical: 4 },
+  thumbCell: { position: 'relative', width: 80, height: 100 },
+  thumbImage: { width: 80, height: 100, borderRadius: 8 },
+  thumbPdf: {
+    width: 80, height: 100, borderRadius: 8,
+    backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', gap: 4,
+  },
+  thumbPdfLabel: { fontSize: 10, fontWeight: '700', color: Colors.primary },
+  thumbRemove: { position: 'absolute', top: -6, right: -6 },
+
+  // Buttons
   primaryButton: {
     backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 10, paddingVertical: 15, paddingHorizontal: 28,
@@ -427,16 +460,15 @@ const styles = StyleSheet.create({
     borderRadius: 12, width: '100%',
   },
   secondaryButtonText: { color: Colors.primary, fontSize: 15, fontWeight: '600' },
-  demoSkipButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#F3E5F5', borderRadius: 8, padding: 10,
-    borderWidth: 1, borderColor: '#CE93D8', marginTop: 4,
+  submitButton: {
+    backgroundColor: Colors.verified, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 10, paddingVertical: 15, paddingHorizontal: 28,
+    borderRadius: 12, width: '100%', marginTop: 4,
   },
-  demoSkipText: { color: '#7B1FA2', fontSize: 12, fontWeight: '600' },
+  submitButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
 
   // Ready / Q&A
   readyContent: { padding: 16, gap: 14, paddingBottom: 32 },
-  docThumb: { width: '100%', height: 180, borderRadius: 12 },
   docThumbPlaceholder: {
     width: '100%', height: 120, borderRadius: 12,
     backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', gap: 8,

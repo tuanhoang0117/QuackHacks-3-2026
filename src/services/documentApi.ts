@@ -16,6 +16,7 @@ export interface SummarizePayload {
 }
 
 async function playAudioBlob(blob: Blob, onDone: () => void): Promise<() => void> {
+  await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
   const base64 = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve((reader.result as string).split(',')[1] ?? '');
@@ -36,9 +37,12 @@ async function playAudioBlob(blob: Blob, onDone: () => void): Promise<() => void
   return () => { sound.unloadAsync(); onDone(); };
 }
 
-// POST /document/summary — uploads image or PDF, returns extracted clinical text
-export async function uploadDocumentForText(uri: string, mimeType: string): Promise<string> {
-  if (DEMO_MODE) return MOCK_SUMMARY.summary;
+// POST /document/summary — uploads image or PDF, returns extracted text + plain-language summary
+export async function uploadDocumentForText(
+  uri: string,
+  mimeType: string,
+): Promise<{ clinicalText: string; summary: string }> {
+  if (DEMO_MODE) return { clinicalText: MOCK_SUMMARY.summary, summary: MOCK_SUMMARY.summary };
 
   const form = new FormData();
   form.append('image', {
@@ -59,7 +63,10 @@ export async function uploadDocumentForText(uri: string, mimeType: string): Prom
   }
 
   const data = await response.json();
-  return (data.clinical_text ?? data.summary ?? '') as string;
+  return {
+    clinicalText: (data.clinical_text ?? data.summary ?? '') as string,
+    summary: (data.summary ?? data.clinical_text ?? '') as string,
+  };
 }
 
 export async function askDocumentQuestion(
@@ -104,18 +111,19 @@ export async function getDocumentSummary(
     return { summary, stop: () => { Speech.stop(); onDone(); } };
   }
 
-  const response = await fetch(`${API_BASE_URL}/summarize`, {
+  // payload.clinicalText carries the pre-generated Gemini summary (not raw clinical text)
+  // so we only need ElevenLabs TTS — no second Gemini call
+  const response = await fetch(`${API_BASE_URL}/speak`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clinical_text: payload.clinicalText }),
+    body: JSON.stringify({ text: payload.clinicalText }),
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new Error(`/summarize error ${response.status}: ${text}`);
+    throw new Error(`/speak error ${response.status}: ${text}`);
   }
 
-  const summary = response.headers.get('X-Summary-Text') ?? '';
   const stop = await playAudioBlob(await response.blob(), onDone);
-  return { summary, stop };
+  return { summary: payload.clinicalText, stop };
 }
