@@ -1,6 +1,8 @@
 import os
 import subprocess
 import datetime
+import asyncio
+from functools import partial
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -163,12 +165,13 @@ async def summarize(request: SummarizeRequest):
     Takes discharge document text.
     Returns a plain-language summary + audio from ElevenLabs.
     """
-    summary = summarize_document(request.clinical_text)
+    loop = asyncio.get_event_loop()
+    summary = await loop.run_in_executor(None, partial(summarize_document, request.clinical_text))
     audio = await _speak_audio(summary[:1000])
     return StreamingResponse(
         iter([audio]),
         media_type="audio/mpeg",
-        headers={"X-Summary-Text": summary[:500]},
+        headers={"X-Summary-Text": summary[:500].replace('\n', ' ').replace('\r', '')},
     )
 
 
@@ -178,26 +181,29 @@ async def ask(request: AskRequest):
     Patient Q&A grounded in discharge document + MongoDB drug data.
     Returns plain-language answer + audio from ElevenLabs.
     """
-    answer = answer_question(request.question, request.clinical_context, db)
+    loop = asyncio.get_event_loop()
+    answer = await loop.run_in_executor(None, partial(answer_question, request.question, request.clinical_context, db))
     audio = await _speak_audio(answer)
     return StreamingResponse(
         iter([audio]),
         media_type="audio/mpeg",
-        headers={"X-Answer-Text": answer[:500]},
+        headers={"X-Answer-Text": answer[:500].replace('\n', ' ').replace('\r', '')},
     )
 
 
 @app.post("/ask/text")
 async def ask_text(request: AskRequest):
     """Text-only Q&A — no ElevenLabs. Fallback when TTS is unavailable."""
-    answer = answer_question(request.question, request.clinical_context, db)
+    loop = asyncio.get_event_loop()
+    answer = await loop.run_in_executor(None, partial(answer_question, request.question, request.clinical_context, db))
     return JSONResponse(content={"answer": answer})
 
 
 @app.post("/summarize/text")
 async def summarize_text(request: SummarizeRequest):
     """Text-only summary — no ElevenLabs. Fallback when TTS is unavailable."""
-    summary = summarize_document(request.clinical_text)
+    loop = asyncio.get_event_loop()
+    summary = await loop.run_in_executor(None, partial(summarize_document, request.clinical_text))
     return JSONResponse(content={"summary": summary})
 
 
